@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<!--
+  ClientDetail.html - Vista de Detalle de Cliente con Historial
+  Adiction Boutique Suite
+  
+  Muestra información completa del cliente, historial de compras,
+  historial de pagos, estado de cuotas pendientes y cupo disponible.
+  
+  Requisitos: 8.5
+-->
+<html lang="es-PE">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Detalle de Cliente - Adiction Boutique</title>
+  
+  <!-- Bootstrap 5.3 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.min.css">
+  
+  <!-- DataTables Bootstrap 5 CSS -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+  
+  <style>
+    .info-label {
+      font-weight: 600;
+      color: #6c757d;
+    }
+    
+    .credit-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-radius: 15px;
+      padding: 20px;
+    }
+    
+    .credit-amount {
+      font-size: 2rem;
+      font-weight: bold;
+    }
+    
+    .status-badge-large {
+      font-size: 1rem;
+      padding: 0.5rem 1rem;
+    }
+  </style>
+</head>
+<body>
+  
+  <div class="container-fluid py-4">
+    
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2>
+        <i class="bi bi-person-circle"></i> 
+        <span id="clientName">Detalle de Cliente</span>
+      </h2>
+      <div class="btn-group" role="group">
+        <button type="button" class="btn btn-outline-primary" onclick="editClient()">
+          <i class="bi bi-pencil"></i> Editar
+        </button>
+        <button type="button" class="btn btn-outline-secondary" onclick="window.location.href='?page=clientes'">
+          <i class="bi bi-arrow-left"></i> Volver
+        </button>
+      </div>
+    </div>
+    
+    <!-- Alert Container -->
+    <div id="alertContainer"></div>
+    
+    <!-- Client Information Card -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-person-vcard"></i> Información del Cliente</h5>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <!-- Personal Information -->
+          <div class="col-md-6 mb-3">
+            <h6 class="text-primary mb-3"><i class="bi bi-person"></i> Datos Personales</h6>
+            <div class="row mb-2">
+              <div class="col-4 info-label">DNI:</div>
+              <div class="col-8" id="clientDNI">-</div>
+            </div>
+            <div class="row mb-2">
+              <div class="col-4 info-label">Nombre:</div>
+              <div class="col-8" id="clientFullName">-</div>
+            </div>
+            <div class="row mb-2">
+              <div class="col-4 info-label">Teléfono:</div>
+              <div class="col-8" id="clientPhone">-</div>
+            </div>
+            <div class="row mb-2">
+              <div class="col-4 info-label">Email:</div>
+              <div class="col-8" id="clientEmail">-</div>
+            </div>
+            <div class="row mb-2">
+              <div class="col-4 info-label">Dirección:</div>
+              <div class="col-8" id="clientAddress">-</div>
+            </div>
+            <div class="row mb-2">
+              <div class="col-4 info-label">Estado:</div>
+              <div class="col-8" id="clientStatus">-</div>
+            </div>
+          </div>
+          
+          <!-- Credit Information -->
+          <div class="col-md-6 mb-3">
+            <h6 class="text-primary mb-3"><i class="bi bi-credit-card"></i> Información de Crédito</h6>
+            <div class="credit-card">
+              <div class="mb-3">
+                <small class="text-white-50">Cupo Disponible</small>
+                <div class="credit-amount" id="creditAvailable">S/ 0.00</div>
+              </div>
+              <div class="row">
+                <div class="col-6">
+                  <small class="text-white-50">Cupo Límite</small>
+                  <div class="h5 mb-0" id="creditLimit">S/ 0.00</div>
+                </div>
+                <div class="col-6">
+                  <small class="text-white-50">Cupo Usado</small>
+                  <div class="h5 mb-0" id="creditUsed">S/ 0.00</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- DNI Photo -->
+            <div class="mt-3" id="dniPhotoContainer" style="display: none;">
+              <a id="dniPhotoLink" href="#" target="_blank" class="btn btn-outline-info btn-sm">
+                <i class="bi bi-card-image"></i> Ver Foto del DNI
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Tabs for History -->
+    <ul class="nav nav-tabs mb-3" id="historyTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="purchases-tab" data-bs-toggle="tab" 
+                data-bs-target="#purchases" type="button" role="tab">
+          <i class="bi bi-cart"></i> Historial de Compras
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="payments-tab" data-bs-toggle="tab" 
+                data-bs-target="#payments" type="button" role="tab">
+          <i class="bi bi-cash-coin"></i> Historial de Pagos
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="installments-tab" data-bs-toggle="tab" 
+                data-bs-target="#installments" type="button" role="tab">
+          <i class="bi bi-calendar-check"></i> Cuotas Pendientes
+        </button>
+      </li>
+    </ul>
+    
+    <div class="tab-content" id="historyTabContent">
+      
+      <!-- Purchases Tab -->
+      <div class="tab-pane fade show active" id="purchases" role="tabpanel">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-cart"></i> Historial de Compras</h5>
+          </div>
+          <div class="card-body">
+            <table id="purchasesTable" class="table table-striped table-hover">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>N° Venta</th>
+                  <th>Tienda</th>
+                  <th>Tipo</th>
+                  <th>Total</th>
+                  <th>Estado Pago</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Data will be loaded via AJAX -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Payments Tab -->
+      <div class="tab-pane fade" id="payments" role="tabpanel">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-cash-coin"></i> Historial de Pagos</h5>
+          </div>
+          <div class="card-body">
+            <table id="paymentsTable" class="table table-striped table-hover">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Monto</th>
+                  <th>Método</th>
+                  <th>Usuario</th>
+                  <th>Recibo</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Data will be loaded via AJAX -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Installments Tab -->
+      <div class="tab-pane fade" id="installments" role="tabpanel">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-calendar-check"></i> Cuotas Pendientes</h5>
+          </div>
+          <div class="card-body">
+            <table id="installmentsTable" class="table table-striped table-hover">
+              <thead>
+                <tr>
+                  <th>Plan</th>
+                  <th>N° Cuota</th>
+                  <th>Monto</th>
+                  <th>Pagado</th>
+                  <th>Saldo</th>
+                  <th>Vencimiento</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Data will be loaded via AJAX -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
+    </div>
+    
+  </div>
+  
+  <!-- jQuery -->
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- DataTables JS -->
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+  
+  <script>
+    let clientId = null;
+    let clientData = null;
+    let purchasesTable, paymentsTable, installmentsTable;
+    
+    $(document).ready(function() {
+      // Get client ID from URL
+      const urlParams = new URLSearchParams(window.location.search);
+      clientId = urlParams.get('id');
+      
+      if (!clientId) {
+        showAlert('danger', 'ID de cliente no especificado');
+        setTimeout(function() {
+          window.location.href = '?page=clientes';
+        }, 2000);
+        return;
+      }
+      
+      // Load client data
+      loadClientData();
+      
+      // Initialize DataTables
+      initializeTables();
+    });
+    
+    /**
+     * Load client data
+     */
+    function loadClientData() {
+      $.ajax({
+        url: '<?= scriptUrl ?>',
+        type: 'POST',
+        data: {
+          action: 'getClient',
+          id: clientId
+        },
+        success: function(response) {
+          if (response.success && response.data) {
+            clientData = response.data;
+            displayClientData(clientData);
+          } else {
+            showAlert('danger', 'Error al cargar datos del cliente: ' + (response.error || 'Error desconocido'));
+          }
+        },
+        error: function(xhr, status, error) {
+          showAlert('danger', 'Error de conexión al cargar cliente: ' + error);
+        }
+      });
+    }
+    
+    /**
+     * Display client data in the UI
+     */
+    function displayClientData(client) {
+      // Update page title
+      $('#clientName').text(client.name);
+      
+      // Personal information
+      $('#clientDNI').text(client.dni || '-');
+      $('#clientFullName').text(client.name || '-');
+      $('#clientPhone').text(client.phone || '-');
+      $('#clientEmail').text(client.email || '-');
+      $('#clientAddress').text(client.address || '-');
+      
+      // Status
+      const isActive = client.active === true || client.active === 'true';
+      const statusBadge = isActive 
+        ? '<span class="badge bg-success status-badge-large">Activo</span>'
+        : '<span class="badge bg-secondary status-badge-large">Inactivo</span>';
+      $('#clientStatus').html(statusBadge);
+      
+      // Credit information
+      const creditLimit = parseFloat(client.credit_limit || 0);
+      const creditUsed = parseFloat(client.credit_used || 0);
+      const creditAvailable = creditLimit - creditUsed;
+      
+      $('#creditLimit').text('S/ ' + creditLimit.toFixed(2));
+      $('#creditUsed').text('S/ ' + creditUsed.toFixed(2));
+      $('#creditAvailable').text('S/ ' + creditAvailable.toFixed(2));
+      
+      // Color code available credit
+      if (creditAvailable <= 0) {
+        $('#creditAvailable').addClass('text-danger');
+      } else if (creditAvailable < creditLimit * 0.2) {
+        $('#creditAvailable').addClass('text-warning');
+      }
+      
+      // DNI Photo
+      if (client.dni_photo_url) {
+        $('#dniPhotoLink').attr('href', client.dni_photo_url);
+        $('#dniPhotoContainer').show();
+      }
+    }
+    
+    /**
+     * Initialize DataTables
+     */
+    function initializeTables() {
+      // Purchases Table
+      purchasesTable = $('#purchasesTable').DataTable({
+        language: {
+          url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
+        },
+        pageLength: 10,
+        lengthMenu: [[10, 25, 50], [10, 25, 50]],
+        responsive: true,
+        processing: true,
+        serverSide: false,
+        ajax: {
+          url: '<?= scriptUrl ?>',
+          type: 'POST',
+          data: function(d) {
+            d.action = 'getClientPurchases';
+            d.clientId = clientId;
+          },
+          dataSrc: function(json) {
+            if (!json.success) {
+              console.error('Error loading purchases:', json.error);
+              return [];
+            }
+            return json.data || [];
+          }
+        },
+        columns: [
+          { 
+            data: 'created_at',
+            render: function(data) {
+              return data ? new Date(data).toLocaleDateString('es-PE') : '-';
+            }
+          },
+          { data: 'sale_number' },
+          { data: 'store_id' },
+          { 
+            data: 'sale_type',
+            render: function(data) {
+              return data === 'CREDITO' 
+                ? '<span class="badge bg-warning">Crédito</span>'
+                : '<span class="badge bg-success">Contado</span>';
+            }
+          },
+          { 
+            data: 'total',
+            render: function(data) {
+              return 'S/ ' + parseFloat(data || 0).toFixed(2);
+            }
+          },
+          { 
+            data: 'payment_status',
+            render: function(data) {
+              switch(data) {
+                case 'PAID':
+                  return '<span class="badge bg-success">Pagado</span>';
+                case 'PENDING':
+                  return '<span class="badge bg-warning">Pendiente</span>';
+                case 'PARTIAL':
+                  return '<span class="badge bg-info">Parcial</span>';
+                default:
+                  return '<span class="badge bg-secondary">-</span>';
+              }
+            }
+          },
+          {
+            data: null,
+            orderable: false,
+            render: function(data, type, row) {
+              return `
+                <button type="button" class="btn btn-sm btn-outline-primary" 
+                        onclick="viewSale('${row.id}')" title="Ver Detalle">
+                  <i class="bi bi-eye"></i>
+                </button>
+              `;
+            }
+          }
+        ],
+        order: [[0, 'desc']]
+      });
+      
+      // Payments Table
+      paymentsTable = $('#paymentsTable').DataTable({
+        language: {
+          url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
+        },
+        pageLength: 10,
+        lengthMenu: [[10, 25, 50], [10, 25, 50]],
+        responsive: true,
+        processing: true,
+        serverSide: false,
+        ajax: {
+          url: '<?= scriptUrl ?>',
+          type: 'POST',
+          data: function(d) {
+            d.action = 'getClientPayments';
+            d.clientId = clientId;
+          },
+          dataSrc: function(json) {
+            if (!json.success) {
+              console.error('Error loading payments:', json.error);
+              return [];
+            }
+            return json.data || [];
+          }
+        },
+        columns: [
+          { 
+            data: 'payment_date',
+            render: function(data) {
+              return data ? new Date(data).toLocaleDateString('es-PE') : '-';
+            }
+          },
+          { 
+            data: 'amount',
+            render: function(data) {
+              return 'S/ ' + parseFloat(data || 0).toFixed(2);
+            }
+          },
+          { 
+            data: 'payment_method',
+            render: function(data) {
+              return data || 'Efectivo';
+            }
+          },
+          { data: 'user_id' },
+          { 
+            data: 'receipt_url',
+            render: function(data) {
+              return data 
+                ? '<a href="' + data + '" target="_blank" class="btn btn-sm btn-outline-info"><i class="bi bi-file-pdf"></i></a>'
+                : '-';
+            }
+          },
+          {
+            data: null,
+            orderable: false,
+            render: function(data, type, row) {
+              let actions = '';
+              if (row.receipt_url) {
+                actions += `
+                  <button type="button" class="btn btn-sm btn-outline-primary" 
+                          onclick="printReceipt('${row.id}')" title="Imprimir">
+                    <i class="bi bi-printer"></i>
+                  </button>
+                `;
+              }
+              return actions || '-';
+            }
+          }
+        ],
+        order: [[0, 'desc']]
+      });
+      
+      // Installments Table
+      installmentsTable = $('#installmentsTable').DataTable({
+        language: {
+          url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
+        },
+        pageLength: 10,
+        lengthMenu: [[10, 25, 50], [10, 25, 50]],
+        responsive: true,
+        processing: true,
+        serverSide: false,
+        ajax: {
+          url: '<?= scriptUrl ?>',
+          type: 'POST',
+          data: function(d) {
+            d.action = 'getClientInstallments';
+            d.clientId = clientId;
+          },
+          dataSrc: function(json) {
+            if (!json.success) {
+              console.error('Error loading installments:', json.error);
+              return [];
+            }
+            return json.data || [];
+          }
+        },
+        columns: [
+          { data: 'plan_id' },
+          { data: 'installment_number' },
+          { 
+            data: 'amount',
+            render: function(data) {
+              return 'S/ ' + parseFloat(data || 0).toFixed(2);
+            }
+          },
+          { 
+            data: 'paid_amount',
+            render: function(data) {
+              return 'S/ ' + parseFloat(data || 0).toFixed(2);
+            }
+          },
+          { 
+            data: null,
+            render: function(data, type, row) {
+              const amount = parseFloat(row.amount || 0);
+              const paidAmount = parseFloat(row.paid_amount || 0);
+              const balance = amount - paidAmount;
+              return 'S/ ' + balance.toFixed(2);
+            }
+          },
+          { 
+            data: 'due_date',
+            render: function(data) {
+              return data ? new Date(data).toLocaleDateString('es-PE') : '-';
+            }
+          },
+          { 
+            data: 'status',
+            render: function(data, type, row) {
+              const dueDate = new Date(row.due_date);
+              const today = new Date();
+              const isOverdue = dueDate < today && data !== 'PAID';
+              
+              switch(data) {
+                case 'PAID':
+                  return '<span class="badge bg-success">Pagada</span>';
+                case 'PARTIAL':
+                  return '<span class="badge bg-info">Parcial</span>';
+                case 'PENDING':
+                  if (isOverdue) {
+                    return '<span class="badge bg-danger">Vencida</span>';
+                  }
+                  return '<span class="badge bg-warning">Pendiente</span>';
+                default:
+                  return '<span class="badge bg-secondary">-</span>';
+              }
+            }
+          },
+          {
+            data: null,
+            orderable: false,
+            render: function(data, type, row) {
+              if (row.status === 'PAID') {
+                return '-';
+              }
+              return `
+                <button type="button" class="btn btn-sm btn-outline-success" 
+                        onclick="registerPayment('${row.id}')" title="Registrar Pago">
+                  <i class="bi bi-cash"></i>
+                </button>
+              `;
+            }
+          }
+        ],
+        order: [[5, 'asc']]
+      });
+    }
+    
+    /**
+     * Edit client
+     */
+    function editClient() {
+      window.location.href = '?page=cliente-form&id=' + clientId;
+    }
+    
+    /**
+     * View sale details
+     */
+    function viewSale(saleId) {
+      window.location.href = '?page=venta-detalle&id=' + saleId;
+    }
+    
+    /**
+     * Print receipt
+     */
+    function printReceipt(paymentId) {
+      // Open receipt in new window for printing
+      window.open('?page=recibo&id=' + paymentId, '_blank');
+    }
+    
+    /**
+     * Register payment for installment
+     */
+    function registerPayment(installmentId) {
+      window.location.href = '?page=cobranzas&installment=' + installmentId;
+    }
+    
+    /**
+     * Show alert message
+     */
+    function showAlert(type, message) {
+      const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+          ${message}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      `;
+      $('#alertContainer').html(alertHtml);
+      
+      // Auto-dismiss after 5 seconds
+      setTimeout(function() {
+        $('.alert').alert('close');
+      }, 5000);
+    }
+  </script>
+  
+</body>
+</html>

@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gestión de Facturas - Adiction Boutique</title>
+  <style>
+    .page-header {
+      margin-bottom: 30px;
+    }
+    
+    .filters-card {
+      margin-bottom: 20px;
+    }
+    
+    .status-badge {
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.85em;
+      font-weight: 500;
+    }
+    
+    .status-generated {
+      background-color: #cfe2ff;
+      color: #084298;
+    }
+    
+    .status-sent {
+      background-color: #d1e7dd;
+      color: #0f5132;
+    }
+    
+    .status-failed {
+      background-color: #f8d7da;
+      color: #842029;
+    }
+    
+    .action-buttons {
+      display: flex;
+      gap: 5px;
+    }
+    
+    .btn-sm {
+      padding: 4px 8px;
+      font-size: 0.875rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container-fluid">
+    <!-- Header -->
+    <div class="page-header">
+      <h2><i class="bi bi-receipt"></i> Gestión de Facturas</h2>
+      <p class="text-muted">Consulta y gestiona las facturas electrónicas generadas</p>
+    </div>
+    
+    <!-- Filtros -->
+    <div class="card filters-card">
+      <div class="card-body">
+        <form id="filtersForm" class="row g-3">
+          <div class="col-md-3">
+            <label for="filterStartDate" class="form-label">Fecha Inicio</label>
+            <input type="date" class="form-control" id="filterStartDate">
+          </div>
+          
+          <div class="col-md-3">
+            <label for="filterEndDate" class="form-label">Fecha Fin</label>
+            <input type="date" class="form-control" id="filterEndDate">
+          </div>
+          
+          <div class="col-md-3">
+            <label for="filterClient" class="form-label">Cliente</label>
+            <input type="text" class="form-control" id="filterClient" placeholder="Buscar por nombre o DNI">
+          </div>
+          
+          <div class="col-md-2">
+            <label for="filterStatus" class="form-label">Estado</label>
+            <select class="form-select" id="filterStatus">
+              <option value="">Todos</option>
+              <option value="GENERATED">Generada</option>
+              <option value="SENT">Enviada</option>
+              <option value="SEND_FAILED">Error al enviar</option>
+            </select>
+          </div>
+          
+          <div class="col-md-1 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary w-100">
+              <i class="bi bi-search"></i> Buscar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    
+    <!-- Tabla de Facturas -->
+    <div class="card">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table id="invoicesTable" class="table table-striped table-hover">
+            <thead>
+              <tr>
+                <th>N° Factura</th>
+                <th>Fecha</th>
+                <th>Cliente</th>
+                <th>DNI/RUC</th>
+                <th>Total</th>
+                <th>Estado</th>
+                <th>Enviado a</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="invoicesTableBody">
+              <!-- Datos cargados dinámicamente -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Modal para reenviar factura -->
+  <div class="modal fade" id="resendModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Reenviar Factura</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="resendForm">
+            <input type="hidden" id="resendInvoiceId">
+            
+            <div class="mb-3">
+              <label for="resendEmail" class="form-label">Email del destinatario</label>
+              <input type="email" class="form-control" id="resendEmail" required>
+              <div class="form-text">Ingrese el email donde desea enviar la factura</div>
+            </div>
+            
+            <div class="alert alert-info">
+              <i class="bi bi-info-circle"></i>
+              Se enviará la factura <strong id="resendInvoiceNumber"></strong>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="btnConfirmResend">
+            <i class="bi bi-send"></i> Enviar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Variables globales
+    let invoicesData = [];
+    let dataTable = null;
+    
+    // Inicializar al cargar la página
+    document.addEventListener('DOMContentLoaded', function() {
+      loadInvoices();
+      setupEventListeners();
+    });
+    
+    // Configurar event listeners
+    function setupEventListeners() {
+      // Filtros
+      document.getElementById('filtersForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        applyFilters();
+      });
+      
+      // Botón de reenvío
+      document.getElementById('btnConfirmResend').addEventListener('click', function() {
+        resendInvoice();
+      });
+    }
+    
+    // Cargar facturas desde el servidor
+    function loadInvoices() {
+      showLoading();
+      
+      google.script.run
+        .withSuccessHandler(function(response) {
+          hideLoading();
+          
+          if (response.success) {
+            invoicesData = response.data;
+            renderInvoicesTable(invoicesData);
+          } else {
+            showError('Error al cargar facturas: ' + response.error);
+          }
+        })
+        .withFailureHandler(function(error) {
+          hideLoading();
+          showError('Error al cargar facturas: ' + error.message);
+        })
+        .getAllInvoices();
+    }
+    
+    // Renderizar tabla de facturas
+    function renderInvoicesTable(invoices) {
+      const tbody = document.getElementById('invoicesTableBody');
+      tbody.innerHTML = '';
+      
+      if (invoices.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No hay facturas para mostrar</td></tr>';
+        return;
+      }
+      
+      invoices.forEach(function(invoice) {
+        const row = document.createElement('tr');
+        
+        // Formatear fecha
+        const issueDate = new Date(invoice.issue_date);
+        const formattedDate = issueDate.toLocaleDateString('es-PE');
+        
+        // Formatear total
+        const formattedTotal = 'S/ ' + parseFloat(invoice.total).toFixed(2);
+        
+        // Estado badge
+        let statusBadge = '';
+        if (invoice.status === 'GENERATED') {
+          statusBadge = '<span class="status-badge status-generated">Generada</span>';
+        } else if (invoice.status === 'SENT') {
+          statusBadge = '<span class="status-badge status-sent">Enviada</span>';
+        } else if (invoice.status === 'SEND_FAILED') {
+          statusBadge = '<span class="status-badge status-failed">Error al enviar</span>';
+        }
+        
+        // Email enviado
+        const sentTo = invoice.sent_to || '-';
+        
+        row.innerHTML = `
+          <td>${invoice.invoice_number}</td>
+          <td>${formattedDate}</td>
+          <td>${invoice.client_name}</td>
+          <td>${invoice.client_dni || '-'}</td>
+          <td>${formattedTotal}</td>
+          <td>${statusBadge}</td>
+          <td>${sentTo}</td>
+          <td>
+            <div class="action-buttons">
+              <button class="btn btn-sm btn-outline-primary" onclick="viewPDF('${invoice.id}')" title="Ver PDF">
+                <i class="bi bi-file-pdf"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-success" onclick="openResendModal('${invoice.id}', '${invoice.invoice_number}')" title="Reenviar por email">
+                <i class="bi bi-send"></i>
+              </button>
+            </div>
+          </td>
+        `;
+        
+        tbody.appendChild(row);
+      });
+      
+      // Inicializar DataTable si no existe
+      if (!dataTable) {
+        dataTable = $('#invoicesTable').DataTable({
+          language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
+          },
+          pageLength: 25,
+          lengthMenu: [[25, 50, 100], [25, 50, 100]],
+          order: [[1, 'desc']] // Ordenar por fecha descendente
+        });
+      } else {
+        dataTable.clear();
+        dataTable.rows.add($(tbody).find('tr'));
+        dataTable.draw();
+      }
+    }
+    
+    // Aplicar filtros
+    function applyFilters() {
+      const startDate = document.getElementById('filterStartDate').value;
+      const endDate = document.getElementById('filterEndDate').value;
+      const client = document.getElementById('filterClient').value.toLowerCase();
+      const status = document.getElementById('filterStatus').value;
+      
+      let filtered = invoicesData;
+      
+      // Filtrar por fecha inicio
+      if (startDate) {
+        const start = new Date(startDate);
+        filtered = filtered.filter(function(inv) {
+          return new Date(inv.issue_date) >= start;
+        });
+      }
+      
+      // Filtrar por fecha fin
+      if (endDate) {
+        const end = new Date(endDate);
+        filtered = filtered.filter(function(inv) {
+          return new Date(inv.issue_date) <= end;
+        });
+      }
+      
+      // Filtrar por cliente
+      if (client) {
+        filtered = filtered.filter(function(inv) {
+          const name = (inv.client_name || '').toLowerCase();
+          const dni = (inv.client_dni || '').toLowerCase();
+          return name.includes(client) || dni.includes(client);
+        });
+      }
+      
+      // Filtrar por estado
+      if (status) {
+        filtered = filtered.filter(function(inv) {
+          return inv.status === status;
+        });
+      }
+      
+      renderInvoicesTable(filtered);
+    }
+    
+    // Ver PDF de factura
+    function viewPDF(invoiceId) {
+      showLoading();
+      
+      google.script.run
+        .withSuccessHandler(function(response) {
+          hideLoading();
+          
+          if (response.success && response.pdfUrl) {
+            window.open(response.pdfUrl, '_blank');
+          } else {
+            showError('Error al obtener PDF: ' + response.error);
+          }
+        })
+        .withFailureHandler(function(error) {
+          hideLoading();
+          showError('Error al obtener PDF: ' + error.message);
+        })
+        .getInvoicePDFUrl(invoiceId);
+    }
+    
+    // Abrir modal de reenvío
+    function openResendModal(invoiceId, invoiceNumber) {
+      document.getElementById('resendInvoiceId').value = invoiceId;
+      document.getElementById('resendInvoiceNumber').textContent = invoiceNumber;
+      document.getElementById('resendEmail').value = '';
+      
+      const modal = new bootstrap.Modal(document.getElementById('resendModal'));
+      modal.show();
+    }
+    
+    // Reenviar factura
+    function resendInvoice() {
+      const invoiceId = document.getElementById('resendInvoiceId').value;
+      const email = document.getElementById('resendEmail').value;
+      
+      if (!email) {
+        showError('Por favor ingrese un email válido');
+        return;
+      }
+      
+      showLoading();
+      
+      google.script.run
+        .withSuccessHandler(function(response) {
+          hideLoading();
+          
+          if (response.success) {
+            showSuccess('Factura enviada exitosamente a ' + email);
+            
+            // Cerrar modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('resendModal'));
+            modal.hide();
+            
+            // Recargar facturas
+            loadInvoices();
+          } else {
+            showError('Error al enviar factura: ' + response.error);
+          }
+        })
+        .withFailureHandler(function(error) {
+          hideLoading();
+          showError('Error al enviar factura: ' + error.message);
+        })
+        .resendInvoiceByEmail(invoiceId, email);
+    }
+    
+    // Utilidades de UI
+    function showLoading() {
+      // Implementar spinner o loading indicator
+      console.log('Loading...');
+    }
+    
+    function hideLoading() {
+      console.log('Loading complete');
+    }
+    
+    function showError(message) {
+      alert('Error: ' + message);
+    }
+    
+    function showSuccess(message) {
+      alert('Éxito: ' + message);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<!--
+  ClientForm.html - Formulario de Registro de Clientes
+  Adiction Boutique Suite
+  
+  Permite crear y editar clientes con validación de DNI único,
+  captura de geolocalización y carga de foto de DNI a Google Drive.
+  
+  Requisitos: 8.1, 8.2, 8.3, 8.4
+-->
+<html lang="es-PE">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registro de Cliente - Adiction Boutique</title>
+  
+  <!-- Bootstrap 5.3 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.min.css">
+  
+  <style>
+    .required-field::after {
+      content: " *";
+      color: red;
+    }
+    
+    #map {
+      height: 300px;
+      width: 100%;
+      border: 1px solid #dee2e6;
+      border-radius: 0.375rem;
+    }
+    
+    .photo-preview {
+      max-width: 100%;
+      max-height: 300px;
+      border: 1px solid #dee2e6;
+      border-radius: 0.375rem;
+      padding: 10px;
+    }
+  </style>
+</head>
+<body>
+  
+  <div class="container-fluid py-4">
+    
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2>
+        <i class="bi bi-person-plus"></i> 
+        <span id="pageTitle">Nuevo Cliente</span>
+      </h2>
+      <button type="button" class="btn btn-outline-secondary" onclick="window.location.href='?page=clientes'">
+        <i class="bi bi-arrow-left"></i> Volver
+      </button>
+    </div>
+    
+    <!-- Alert Container -->
+    <div id="alertContainer"></div>
+    
+    <!-- Client Form Card -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-person-vcard"></i> Datos del Cliente</h5>
+      </div>
+      <div class="card-body">
+        <form id="clientForm">
+          
+          <!-- Hidden ID field for edit mode -->
+          <input type="hidden" id="clientId" name="id">
+          
+          <!-- Personal Information Section -->
+          <div class="row mb-4">
+            <div class="col-12">
+              <h6 class="text-primary"><i class="bi bi-person"></i> Información Personal</h6>
+              <hr>
+            </div>
+          </div>
+          
+          <div class="row g-3 mb-4">
+            <!-- DNI -->
+            <div class="col-md-4">
+              <label for="dni" class="form-label required-field">DNI</label>
+              <input type="text" class="form-control" id="dni" name="dni" 
+                     maxlength="8" pattern="[0-9]{8}" required
+                     placeholder="12345678">
+              <div class="invalid-feedback">
+                DNI debe tener 8 dígitos numéricos
+              </div>
+            </div>
+            
+            <!-- Name -->
+            <div class="col-md-8">
+              <label for="name" class="form-label required-field">Nombre Completo</label>
+              <input type="text" class="form-control" id="name" name="name" 
+                     required maxlength="200"
+                     placeholder="Juan Pérez García">
+              <div class="invalid-feedback">
+                Nombre es requerido
+              </div>
+            </div>
+          </div>
+          
+          <!-- Contact Information Section -->
+          <div class="row mb-4">
+            <div class="col-12">
+              <h6 class="text-primary"><i class="bi bi-telephone"></i> Información de Contacto</h6>
+              <hr>
+            </div>
+          </div>
+          
+          <div class="row g-3 mb-4">
+            <!-- Phone -->
+            <div class="col-md-4">
+              <label for="phone" class="form-label required-field">Teléfono</label>
+              <input type="tel" class="form-control" id="phone" name="phone" 
+                     required maxlength="15"
+                     placeholder="987654321">
+              <div class="invalid-feedback">
+                Teléfono es requerido
+              </div>
+            </div>
+            
+            <!-- Email -->
+            <div class="col-md-8">
+              <label for="email" class="form-label">Email</label>
+              <input type="email" class="form-control" id="email" name="email" 
+                     maxlength="200"
+                     placeholder="cliente@example.com">
+              <small class="form-text text-muted">Opcional</small>
+            </div>
+          </div>
+          
+          <!-- Address Section -->
+          <div class="row mb-4">
+            <div class="col-12">
+              <h6 class="text-primary"><i class="bi bi-geo-alt"></i> Dirección</h6>
+              <hr>
+            </div>
+          </div>
+          
+          <div class="row g-3 mb-4">
+            <!-- Address -->
+            <div class="col-md-12">
+              <label for="address" class="form-label required-field">Dirección Completa</label>
+              <textarea class="form-control" id="address" name="address" 
+                        rows="2" required maxlength="500"
+                        placeholder="Av. Principal 123, Distrito, Provincia"></textarea>
+              <div class="invalid-feedback">
+                Dirección es requerida
+              </div>
+            </div>
+          </div>
+          
+          <!-- Geolocation Section -->
+          <div class="row g-3 mb-4">
+            <div class="col-md-12">
+              <label class="form-label">Geolocalización (Opcional)</label>
+              <div class="d-flex gap-2 mb-2">
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="captureGeolocation()">
+                  <i class="bi bi-geo-alt-fill"></i> Capturar Ubicación Actual
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearGeolocation()">
+                  <i class="bi bi-x-circle"></i> Limpiar
+                </button>
+              </div>
+              <div class="row g-2">
+                <div class="col-md-6">
+                  <input type="text" class="form-control form-control-sm" id="lat" name="lat" 
+                         placeholder="Latitud" readonly>
+                </div>
+                <div class="col-md-6">
+                  <input type="text" class="form-control form-control-sm" id="lng" name="lng" 
+                         placeholder="Longitud" readonly>
+                </div>
+              </div>
+              <small class="form-text text-muted">
+                La geolocalización ayuda a ubicar el domicilio del cliente en el mapa
+              </small>
+            </div>
+          </div>
+          
+          <!-- Credit Information Section -->
+          <div class="row mb-4">
+            <div class="col-12">
+              <h6 class="text-primary"><i class="bi bi-credit-card"></i> Información de Crédito</h6>
+              <hr>
+            </div>
+          </div>
+          
+          <div class="row g-3 mb-4">
+            <!-- Credit Limit -->
+            <div class="col-md-6">
+              <label for="credit_limit" class="form-label required-field">Cupo de Crédito (S/)</label>
+              <input type="number" class="form-control" id="credit_limit" name="credit_limit" 
+                     min="0" step="0.01" required
+                     placeholder="0.00">
+              <div class="invalid-feedback">
+                Cupo de crédito es requerido y debe ser mayor o igual a 0
+              </div>
+              <small class="form-text text-muted">
+                Monto máximo que el cliente puede deber
+              </small>
+            </div>
+            
+            <!-- Credit Used (readonly in create mode) -->
+            <div class="col-md-6">
+              <label for="credit_used" class="form-label">Cupo Usado (S/)</label>
+              <input type="number" class="form-control" id="credit_used" name="credit_used" 
+                     value="0.00" readonly>
+              <small class="form-text text-muted">
+                Monto actualmente adeudado (calculado automáticamente)
+              </small>
+            </div>
+          </div>
+          
+          <!-- DNI Photo Section -->
+          <div class="row mb-4">
+            <div class="col-12">
+              <h6 class="text-primary"><i class="bi bi-card-image"></i> Foto del DNI</h6>
+              <hr>
+            </div>
+          </div>
+          
+          <div class="row g-3 mb-4">
+            <div class="col-md-12">
+              <label for="dni_photo" class="form-label">Subir Foto del DNI</label>
+              <input type="file" class="form-control" id="dni_photo" name="dni_photo" 
+                     accept="image/*" onchange="previewPhoto(this)">
+              <small class="form-text text-muted">
+                Formatos aceptados: JPG, PNG. Máximo 5MB
+              </small>
+              
+              <!-- Photo Preview -->
+              <div id="photoPreviewContainer" class="mt-3" style="display: none;">
+                <img id="photoPreview" class="photo-preview" alt="Vista previa">
+              </div>
+              
+              <!-- Existing Photo (in edit mode) -->
+              <div id="existingPhotoContainer" class="mt-3" style="display: none;">
+                <p class="mb-2"><strong>Foto actual:</strong></p>
+                <a id="existingPhotoLink" href="#" target="_blank" class="btn btn-sm btn-outline-info">
+                  <i class="bi bi-eye"></i> Ver Foto Actual
+                </a>
+              </div>
+              
+              <!-- Hidden field for photo URL -->
+              <input type="hidden" id="dni_photo_url" name="dni_photo_url">
+            </div>
+          </div>
+          
+          <!-- Status Section (only in edit mode) -->
+          <div class="row mb-4" id="statusSection" style="display: none;">
+            <div class="col-12">
+              <h6 class="text-primary"><i class="bi bi-toggle-on"></i> Estado</h6>
+              <hr>
+            </div>
+            <div class="col-md-6">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="active" name="active" checked>
+                <label class="form-check-label" for="active">
+                  Cliente Activo
+                </label>
+              </div>
+              <small class="form-text text-muted">
+                Los clientes inactivos no pueden realizar nuevas compras a crédito
+              </small>
+            </div>
+          </div>
+          
+          <!-- Form Actions -->
+          <div class="row">
+            <div class="col-12">
+              <hr>
+              <div class="d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-secondary" onclick="window.location.href='?page=clientes'">
+                  <i class="bi bi-x-circle"></i> Cancelar
+                </button>
+                <button type="submit" class="btn btn-primary" id="submitBtn">
+                  <i class="bi bi-save"></i> Guardar Cliente
+                </button>
+              </div>
+            </div>
+          </div>
+          
+        </form>
+      </div>
+    </div>
+    
+  </div>
+  
+  <!-- jQuery -->
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <script>
+    let isEditMode = false;
+    let originalDNI = null;
+    
+    $(document).ready(function() {
+      // Check if we're in edit mode
+      const urlParams = new URLSearchParams(window.location.search);
+      const clientId = urlParams.get('id');
+      
+      if (clientId) {
+        isEditMode = true;
+        $('#pageTitle').text('Editar Cliente');
+        $('#statusSection').show();
+        loadClientData(clientId);
+      }
+      
+      // Form submission
+      $('#clientForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        // Validate form
+        if (!this.checkValidity()) {
+          e.stopPropagation();
+          $(this).addClass('was-validated');
+          return;
+        }
+        
+        saveClient();
+      });
+      
+      // DNI validation on blur
+      $('#dni').on('blur', function() {
+        const dni = $(this).val().trim();
+        if (dni && dni.length === 8) {
+          // Only validate uniqueness if it's a new client or DNI changed
+          if (!isEditMode || dni !== originalDNI) {
+            validateDNIUniqueness(dni);
+          }
+        }
+      });
+    });
+    
+    /**
+     * Load client data for edit mode
+     */
+    function loadClientData(clientId) {
+      showLoading();
+      
+      $.ajax({
+        url: '<?= scriptUrl ?>',
+        type: 'POST',
+        data: {
+          action: 'getClient',
+          id: clientId
+        },
+        success: function(response) {
+          hideLoading();
+          
+          if (response.success && response.data) {
+            const client = response.data;
+            
+            // Populate form fields
+            $('#clientId').val(client.id);
+            $('#dni').val(client.dni);
+            $('#name').val(client.name);
+            $('#phone').val(client.phone || '');
+            $('#email').val(client.email || '');
+            $('#address').val(client.address || '');
+            $('#lat').val(client.lat || '');
+            $('#lng').val(client.lng || '');
+            $('#credit_limit').val(parseFloat(client.credit_limit || 0).toFixed(2));
+            $('#credit_used').val(parseFloat(client.credit_used || 0).toFixed(2));
+            $('#dni_photo_url').val(client.dni_photo_url || '');
+            $('#active').prop('checked', client.active === true || client.active === 'true');
+            
+            // Store original DNI for validation
+            originalDNI = client.dni;
+            
+            // Show existing photo if available
+            if (client.dni_photo_url) {
+              $('#existingPhotoLink').attr('href', client.dni_photo_url);
+              $('#existingPhotoContainer').show();
+            }
+          } else {
+            showAlert('danger', 'Error al cargar datos del cliente: ' + (response.error || 'Error desconocido'));
+          }
+        },
+        error: function(xhr, status, error) {
+          hideLoading();
+          showAlert('danger', 'Error de conexión al cargar cliente: ' + error);
+        }
+      });
+    }
+    
+    /**
+     * Validate DNI uniqueness
+     */
+    function validateDNIUniqueness(dni) {
+      $.ajax({
+        url: '<?= scriptUrl ?>',
+        type: 'POST',
+        data: {
+          action: 'getClientByDNI',
+          dni: dni
+        },
+        success: function(response) {
+          if (response.success && response.data) {
+            // DNI already exists
+            $('#dni').addClass('is-invalid');
+            $('#dni').siblings('.invalid-feedback').text('Este DNI ya está registrado');
+            showAlert('warning', 'El DNI ' + dni + ' ya está registrado en el sistema');
+          } else {
+            // DNI is unique
+            $('#dni').removeClass('is-invalid');
+          }
+        },
+        error: function() {
+          // If error, assume DNI is unique (client not found)
+          $('#dni').removeClass('is-invalid');
+        }
+      });
+    }
+    
+    /**
+     * Save client (create or update)
+     */
+    function saveClient() {
+      const submitBtn = $('#submitBtn');
+      submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Guardando...');
+      
+      // Prepare form data
+      const formData = {
+        action: isEditMode ? 'client/update' : 'client/create',
+        id: $('#clientId').val(),
+        dni: $('#dni').val().trim(),
+        name: $('#name').val().trim(),
+        phone: $('#phone').val().trim(),
+        email: $('#email').val().trim(),
+        address: $('#address').val().trim(),
+        lat: $('#lat').val().trim(),
+        lng: $('#lng').val().trim(),
+        credit_limit: parseFloat($('#credit_limit').val() || 0),
+        credit_used: parseFloat($('#credit_used').val() || 0),
+        dni_photo_url: $('#dni_photo_url').val(),
+        active: $('#active').is(':checked')
+      };
+      
+      // Handle photo upload if new photo selected
+      const photoFile = $('#dni_photo')[0].files[0];
+      if (photoFile) {
+        uploadPhotoAndSave(photoFile, formData, submitBtn);
+      } else {
+        saveClientData(formData, submitBtn);
+      }
+    }
+    
+    /**
+     * Upload photo to Google Drive and then save client
+     */
+    function uploadPhotoAndSave(photoFile, formData, submitBtn) {
+      // Read file as base64
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const base64Data = e.target.result.split(',')[1];
+        
+        // Upload to Drive
+        $.ajax({
+          url: '<?= scriptUrl ?>',
+          type: 'POST',
+          data: {
+            action: 'uploadDNIPhoto',
+            fileName: photoFile.name,
+            mimeType: photoFile.type,
+            base64Data: base64Data,
+            clientDNI: formData.dni
+          },
+          success: function(response) {
+            if (response.success && response.data && response.data.url) {
+              // Update form data with photo URL
+              formData.dni_photo_url = response.data.url;
+              saveClientData(formData, submitBtn);
+            } else {
+              submitBtn.prop('disabled', false).html('<i class="bi bi-save"></i> Guardar Cliente');
+              showAlert('danger', 'Error al subir foto: ' + (response.error || 'Error desconocido'));
+            }
+          },
+          error: function(xhr, status, error) {
+            submitBtn.prop('disabled', false).html('<i class="bi bi-save"></i> Guardar Cliente');
+            showAlert('danger', 'Error de conexión al subir foto: ' + error);
+          }
+        });
+      };
+      reader.readAsDataURL(photoFile);
+    }
+    
+    /**
+     * Save client data to database
+     */
+    function saveClientData(formData, submitBtn) {
+      $.ajax({
+        url: '<?= scriptUrl ?>',
+        type: 'POST',
+        data: formData,
+        success: function(response) {
+          submitBtn.prop('disabled', false).html('<i class="bi bi-save"></i> Guardar Cliente');
+          
+          if (response.success) {
+            showAlert('success', isEditMode ? 'Cliente actualizado exitosamente' : 'Cliente registrado exitosamente');
+            
+            // Redirect to client list after 1.5 seconds
+            setTimeout(function() {
+              window.location.href = '?page=clientes';
+            }, 1500);
+          } else {
+            showAlert('danger', 'Error al guardar cliente: ' + (response.error || 'Error desconocido'));
+          }
+        },
+        error: function(xhr, status, error) {
+          submitBtn.prop('disabled', false).html('<i class="bi bi-save"></i> Guardar Cliente');
+          showAlert('danger', 'Error de conexión al guardar cliente: ' + error);
+        }
+      });
+    }
+    
+    /**
+     * Capture geolocation using browser API
+     */
+    function captureGeolocation() {
+      if (!navigator.geolocation) {
+        showAlert('warning', 'La geolocalización no está soportada en este navegador');
+        return;
+      }
+      
+      showAlert('info', 'Capturando ubicación...');
+      
+      navigator.geolocation.getCurrentPosition(
+        function(position) {
+          $('#lat').val(position.coords.latitude.toFixed(6));
+          $('#lng').val(position.coords.longitude.toFixed(6));
+          showAlert('success', 'Ubicación capturada exitosamente');
+        },
+        function(error) {
+          let errorMsg = 'Error al capturar ubicación';
+          switch(error.code) {
+            case error.PERMISSION_DENIED:
+              errorMsg = 'Permiso de ubicación denegado';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMsg = 'Ubicación no disponible';
+              break;
+            case error.TIMEOUT:
+              errorMsg = 'Tiempo de espera agotado';
+              break;
+          }
+          showAlert('danger', errorMsg);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      );
+    }
+    
+    /**
+     * Clear geolocation fields
+     */
+    function clearGeolocation() {
+      $('#lat').val('');
+      $('#lng').val('');
+      showAlert('info', 'Geolocalización eliminada');
+    }
+    
+    /**
+     * Preview photo before upload
+     */
+    function previewPhoto(input) {
+      if (input.files && input.files[0]) {
+        // Validate file size (max 5MB)
+        if (input.files[0].size > 5 * 1024 * 1024) {
+          showAlert('danger', 'El archivo es demasiado grande. Máximo 5MB');
+          input.value = '';
+          return;
+        }
+        
+        // Validate file type
+        if (!input.files[0].type.match('image.*')) {
+          showAlert('danger', 'Solo se permiten archivos de imagen');
+          input.value = '';
+          return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          $('#photoPreview').attr('src', e.target.result);
+          $('#photoPreviewContainer').show();
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+    
+    /**
+     * Show alert message
+     */
+    function showAlert(type, message) {
+      const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+          ${message}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      `;
+      $('#alertContainer').html(alertHtml);
+      
+      // Auto-dismiss after 5 seconds
+      setTimeout(function() {
+        $('.alert').alert('close');
+      }, 5000);
+    }
+    
+    /**
+     * Show loading indicator
+     */
+    function showLoading() {
+      const loadingHtml = `
+        <div class="alert alert-info" role="alert">
+          <span class="spinner-border spinner-border-sm me-2"></span>
+          Cargando datos...
+        </div>
+      `;
+      $('#alertContainer').html(loadingHtml);
+    }
+    
+    /**
+     * Hide loading indicator
+     */
+    function hideLoading() {
+      $('#alertContainer').html('');
+    }
+  </script>
+  
+</body>
+</html>

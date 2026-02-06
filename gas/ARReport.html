@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reporte de Cuentas por Cobrar - Adiction Boutique Suite</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+  <style>
+    .delinquency-high {
+      color: #dc3545;
+      font-weight: bold;
+    }
+    .delinquency-medium {
+      color: #ffc107;
+      font-weight: bold;
+    }
+    .delinquency-low {
+      color: #198754;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container-fluid py-4">
+    <h2><i class="bi bi-cash-coin"></i> Reporte de Cuentas por Cobrar</h2>
+    <p class="text-muted">Estado de la cartera de créditos</p>
+
+    <!-- Filtros -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">Fecha de Corte</label>
+            <input type="date" class="form-control" id="asOfDate">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">&nbsp;</label>
+            <button class="btn btn-primary w-100" onclick="generateReport()">
+              <i class="bi bi-search"></i> Generar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Métricas -->
+    <div id="metricsSection" style="display:none;">
+      <div class="row mb-4">
+        <div class="col-md-3">
+          <div class="card">
+            <div class="card-body">
+              <h6 class="text-muted">Total por Cobrar</h6>
+              <h3 id="metricTotalReceivable">S/ 0.00</h3>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card border-danger">
+            <div class="card-body">
+              <h6 class="text-muted">Vencido</h6>
+              <h3 id="metricOverdue" class="text-danger">S/ 0.00</h3>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card">
+            <div class="card-body">
+              <h6 class="text-muted">Por Vencer</h6>
+              <h3 id="metricDueSoon">S/ 0.00</h3>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card">
+            <div class="card-body">
+              <h6 class="text-muted">Índice de Morosidad</h6>
+              <h3 id="metricDelinquency">0%</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Antigüedad de Saldos -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">Antigüedad de Saldos</h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-3">
+              <div class="text-center p-3 border rounded">
+                <h6 class="text-muted">0-30 días</h6>
+                <h4 id="aging0to30">S/ 0.00</h4>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="text-center p-3 border rounded">
+                <h6 class="text-muted">31-60 días</h6>
+                <h4 id="aging31to60">S/ 0.00</h4>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="text-center p-3 border rounded">
+                <h6 class="text-muted">61-90 días</h6>
+                <h4 id="aging61to90">S/ 0.00</h4>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="text-center p-3 border rounded bg-danger text-white">
+                <h6>Más de 90 días</h6>
+                <h4 id="aging90plus">S/ 0.00</h4>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Deudores -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">Top 10 Clientes con Mayor Deuda</h5>
+        </div>
+        <div class="card-body">
+          <table id="topDebtorsTable" class="table table-striped">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Cliente</th>
+                <th>Total Deuda</th>
+                <th>Vencido</th>
+                <th>Por Vencer</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Detalle de Clientes -->
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">Detalle por Cliente</h5>
+        </div>
+        <div class="card-body">
+          <table id="clientsTable" class="table table-striped">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Total</th>
+                <th>Vencido</th>
+                <th>Por Vencer</th>
+                <th>0-30d</th>
+                <th>31-60d</th>
+                <th>61-90d</th>
+                <th>>90d</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+  <script>
+    let clientsDataTable = null;
+
+    // Establecer fecha por defecto (hoy)
+    document.addEventListener('DOMContentLoaded', function() {
+      document.getElementById('asOfDate').valueAsDate = new Date();
+      generateReport();
+    });
+
+    function generateReport() {
+      const asOfDate = document.getElementById('asOfDate').value;
+
+      google.script.run
+        .withSuccessHandler(displayReport)
+        .withFailureHandler(function(error) {
+          alert('Error al generar reporte: ' + error.message);
+        })
+        .getAccountsReceivableReport({ asOfDate: asOfDate });
+    }
+
+    function displayReport(report) {
+      // Mostrar sección de métricas
+      document.getElementById('metricsSection').style.display = 'block';
+
+      // Actualizar métricas principales
+      document.getElementById('metricTotalReceivable').textContent = 
+        'S/ ' + report.summary.totalReceivable.toFixed(2);
+      document.getElementById('metricOverdue').textContent = 
+        'S/ ' + report.summary.totalOverdue.toFixed(2);
+      document.getElementById('metricDueSoon').textContent = 
+        'S/ ' + report.summary.totalDueSoon.toFixed(2);
+      
+      const delinquencyRate = report.summary.delinquencyRate;
+      const delinquencyEl = document.getElementById('metricDelinquency');
+      delinquencyEl.textContent = delinquencyRate.toFixed(2) + '%';
+      
+      // Colorear según nivel de morosidad
+      if (delinquencyRate > 30) {
+        delinquencyEl.className = 'delinquency-high';
+      } else if (delinquencyRate > 15) {
+        delinquencyEl.className = 'delinquency-medium';
+      } else {
+        delinquencyEl.className = 'delinquency-low';
+      }
+
+      // Calcular antigüedad total
+      let aging0to30 = 0, aging31to60 = 0, aging61to90 = 0, aging90plus = 0;
+      
+      report.clients.forEach(function(client) {
+        aging0to30 += client.aging.current;
+        aging31to60 += client.aging.days30;
+        aging61to90 += client.aging.days60;
+        aging90plus += client.aging.days90Plus;
+      });
+
+      document.getElementById('aging0to30').textContent = 'S/ ' + aging0to30.toFixed(2);
+      document.getElementById('aging31to60').textContent = 'S/ ' + aging31to60.toFixed(2);
+      document.getElementById('aging61to90').textContent = 'S/ ' + aging61to90.toFixed(2);
+      document.getElementById('aging90plus').textContent = 'S/ ' + aging90plus.toFixed(2);
+
+      // Actualizar tabla de top deudores
+      const topTbody = document.querySelector('#topDebtorsTable tbody');
+      topTbody.innerHTML = '';
+      
+      report.topDebtors.forEach(function(client, index) {
+        const row = topTbody.insertRow();
+        row.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${client.clientName}</td>
+          <td>S/ ${client.totalBalance.toFixed(2)}</td>
+          <td class="text-danger">S/ ${client.overdueBalance.toFixed(2)}</td>
+          <td>S/ ${client.currentBalance.toFixed(2)}</td>
+        `;
+      });
+
+      // Actualizar tabla de clientes
+      if (clientsDataTable) {
+        clientsDataTable.destroy();
+      }
+
+      const clientsTbody = document.querySelector('#clientsTable tbody');
+      clientsTbody.innerHTML = '';
+      
+      report.clients.forEach(function(client) {
+        const row = clientsTbody.insertRow();
+        row.innerHTML = `
+          <td>${client.clientName}</td>
+          <td>S/ ${client.totalBalance.toFixed(2)}</td>
+          <td class="text-danger">S/ ${client.overdueBalance.toFixed(2)}</td>
+          <td>S/ ${client.currentBalance.toFixed(2)}</td>
+          <td>S/ ${client.aging.current.toFixed(2)}</td>
+          <td>S/ ${client.aging.days30.toFixed(2)}</td>
+          <td>S/ ${client.aging.days60.toFixed(2)}</td>
+          <td>S/ ${client.aging.days90Plus.toFixed(2)}</td>
+        `;
+      });
+
+      // Inicializar DataTable
+      clientsDataTable = $('#clientsTable').DataTable({
+        language: {
+          url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
+        },
+        pageLength: 25,
+        lengthMenu: [[25, 50, 100], [25, 50, 100]],
+        order: [[1, 'desc']] // Ordenar por total descendente
+      });
+    }
+  </script>
+</body>
+</html>

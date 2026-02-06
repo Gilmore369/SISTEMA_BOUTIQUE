@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reporte de Inventario - Adiction Boutique Suite</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+  <style>
+    .low-stock {
+      background-color: #fff3cd !important;
+    }
+    .low-stock-badge {
+      background-color: #ffc107;
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+  <div class="container-fluid py-4">
+    <h2><i class="bi bi-box-seam"></i> Reporte de Inventario</h2>
+    <p class="text-muted">Estado actual del stock y valorización</p>
+
+    <!-- Filtros -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">Almacén</label>
+            <select class="form-select" id="warehouseId">
+              <option value="">Todos</option>
+              <option value="WH_MUJERES">Almacén Mujeres</option>
+              <option value="WH_HOMBRES">Almacén Hombres</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">&nbsp;</label>
+            <button class="btn btn-primary w-100" onclick="generateReport()">
+              <i class="bi bi-search"></i> Generar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Métricas -->
+    <div id="metricsSection" style="display:none;">
+      <div class="row mb-4">
+        <div class="col-md-4">
+          <div class="card">
+            <div class="card-body">
+              <h6 class="text-muted">Total Productos</h6>
+              <h3 id="metricTotalProducts">0</h3>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card">
+            <div class="card-body">
+              <h6 class="text-muted">Valor Total</h6>
+              <h3 id="metricTotalValue">S/ 0.00</h3>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card">
+            <div class="card-body">
+              <h6 class="text-muted">Productos con Stock Bajo</h6>
+              <h3 id="metricLowStock" class="text-warning">0</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabla de Inventario -->
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">Detalle de Inventario</h5>
+        </div>
+        <div class="card-body">
+          <table id="inventoryTable" class="table table-striped">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Categoría</th>
+                <th>Cantidad</th>
+                <th>Precio</th>
+                <th>Valor</th>
+                <th>Stock Mín.</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+  <script>
+    // CRÍTICO: Usar SCRIPT_URL del contexto global (definido en index.html)
+    // NO declarar con const/let/var para evitar error de redeclaración
+    if (typeof SCRIPT_URL === 'undefined') {
+      console.error('SCRIPT_URL no está definido. Las llamadas AJAX fallarán.');
+      var SCRIPT_URL = window.SCRIPT_URL || window.parent.SCRIPT_URL || '';
+    } else {
+      console.log('SCRIPT_URL disponible para Inventory:', SCRIPT_URL);
+    }
+    
+    let inventoryDataTable = null;
+
+    // Generar reporte al cargar
+    $(document).ready(function() {
+      generateReport();
+    });
+
+    function generateReport() {
+      const warehouseId = $('#warehouseId').val() || null;
+      
+      console.log('Generando reporte para almacén:', warehouseId);
+
+      $.ajax({
+        url: SCRIPT_URL,
+        type: 'POST',
+        data: {
+          action: 'getInventoryReport',
+          warehouseId: warehouseId
+        },
+        success: function(response) {
+          console.log('Respuesta del servidor:', response);
+          
+          if (response && (response.success || response.ok)) {
+            displayReport(response.data);
+          } else {
+            alert('Error al generar reporte: ' + (response.error || 'Error desconocido'));
+          }
+        },
+        error: function(xhr, status, error) {
+          console.error('Error AJAX:', error);
+          alert('Error de conexión al generar reporte: ' + error);
+        }
+      });
+    }
+
+    function displayReport(report) {
+      console.log('Mostrando reporte:', report);
+      
+      // Mostrar sección de métricas
+      $('#metricsSection').show();
+
+      // Actualizar métricas
+      $('#metricTotalProducts').text(report.totalProducts || 0);
+      $('#metricTotalValue').text('S/ ' + parseFloat(report.totalValue || 0).toFixed(2));
+      $('#metricLowStock').text(report.lowStockCount || 0);
+
+      // Actualizar tabla
+      if (inventoryDataTable) {
+        inventoryDataTable.destroy();
+      }
+
+      const tbody = $('#inventoryTable tbody');
+      tbody.empty();
+      
+      if (!report.inventory || report.inventory.length === 0) {
+        tbody.append('<tr><td colspan="7" class="text-center text-muted">No hay datos de inventario</td></tr>');
+        return;
+      }
+      
+      report.inventory.forEach(function(item) {
+        const row = $('<tr>');
+        if (item.isLowStock) {
+          row.addClass('low-stock');
+        }
+        
+        row.html(`
+          <td>${item.productName}</td>
+          <td>${item.category || '-'}</td>
+          <td>${item.quantity}</td>
+          <td>S/ ${parseFloat(item.price).toFixed(2)}</td>
+          <td>S/ ${parseFloat(item.value).toFixed(2)}</td>
+          <td>${item.minStock}</td>
+          <td>
+            ${item.isLowStock 
+              ? '<span class="badge low-stock-badge"><i class="bi bi-exclamation-triangle"></i> Stock Bajo</span>'
+              : '<span class="badge bg-success">OK</span>'}
+          </td>
+        `);
+        
+        tbody.append(row);
+      });
+
+      // Inicializar DataTable
+      inventoryDataTable = $('#inventoryTable').DataTable({
+        language: {
+          url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
+        },
+        pageLength: 25,
+        lengthMenu: [[25, 50, 100], [25, 50, 100]],
+        order: [[4, 'desc']] // Ordenar por valor descendente
+      });
+    }
+  </script>
+</body>
+</html>

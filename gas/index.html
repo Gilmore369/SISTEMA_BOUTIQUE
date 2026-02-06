@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<!--
+  index.html - Layout Principal
+  Adiction Boutique Suite
+  
+  Este archivo es un template HTML que se evalúa en el servidor.
+  Variables disponibles desde el servidor:
+  - userName: Nombre del usuario
+  - userEmail: Email del usuario
+  - userRoles: JSON string con los roles del usuario
+  - currentPage: Página actual (para marcar nav activo)
+-->
+<html lang="es-PE">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Adiction Boutique Suite</title>
+  
+  <!-- Bootstrap 5.3 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+  
+  <!-- Bootstrap Icons 1.11 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.min.css">
+  
+  <!-- DataTables Bootstrap 5 CSS -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+  
+  <style>
+    /* Minimal custom styles */
+    body {
+      font-size: 0.9rem;
+    }
+    
+    .sidebar {
+      position: fixed;
+      top: 56px;
+      bottom: 0;
+      left: 0;
+      z-index: 100;
+      padding: 48px 0 0;
+      box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+      overflow-y: auto;
+    }
+    
+    .sidebar .nav-link {
+      font-weight: 500;
+      color: #333;
+      padding: 0.75rem 1rem;
+    }
+    
+    .sidebar .nav-link:hover {
+      color: #0d6efd;
+      background-color: #f8f9fa;
+    }
+    
+    .sidebar .nav-link.active {
+      color: #0d6efd;
+      background-color: #e7f1ff;
+    }
+    
+    .sidebar .nav-link i {
+      margin-right: 0.5rem;
+    }
+    
+    main {
+      padding-top: 56px;
+    }
+    
+    @media (max-width: 767.98px) {
+      .sidebar {
+        position: static;
+        padding: 0;
+      }
+      
+      main {
+        padding-top: 0;
+      }
+    }
+    
+    .navbar-brand {
+      font-weight: 600;
+    }
+    
+    .content-wrapper {
+      padding: 2rem 0;
+    }
+  </style>
+</head>
+<body>
+  
+  <!-- Topbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#" onclick="navigateTo('dashboard'); return false;">
+        <i class="bi bi-shop"></i> Adiction Boutique
+      </a>
+      
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-person-circle"></i> <span id="userName"><?= userName ?></span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+              <li><h6 class="dropdown-header"><?= userEmail ?></h6></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="#" onclick="navigateTo('settings'); return false;"><i class="bi bi-gear"></i> Configuración</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="?action=logout"><i class="bi bi-box-arrow-right"></i> Cerrar Sesión</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+  
+  <div class="container-fluid">
+    <div class="row">
+      
+      <!-- Sidebar -->
+      <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse" id="sidebarMenu">
+        <div class="position-sticky pt-3">
+          <ul class="nav flex-column">
+            <li class="nav-item">
+              <a class="nav-link" href="#" onclick="navigateTo('dashboard'); return false;">
+                <i class="bi bi-speedometer2"></i>
+                Dashboard
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" onclick="navigateTo('pos'); return false;">
+                <i class="bi bi-cart"></i>
+                Punto de Venta
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" onclick="navigateTo('inventory'); return false;">
+                <i class="bi bi-box-seam"></i>
+                Inventario
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" onclick="navigateTo('clients'); return false;">
+                <i class="bi bi-people"></i>
+                Clientes
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" onclick="navigateTo('collections'); return false;">
+                <i class="bi bi-cash-coin"></i>
+                Cobranzas
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" onclick="navigateTo('cash'); return false;">
+                <i class="bi bi-wallet2"></i>
+                Caja
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" onclick="navigateTo('reports'); return false;">
+                <i class="bi bi-graph-up"></i>
+                Reportes
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" onclick="navigateTo('invoices'); return false;">
+                <i class="bi bi-receipt"></i>
+                Facturas
+              </a>
+            </li>
+          </ul>
+        </div>
+      </nav>
+      
+      <!-- Main Content Area -->
+      <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+        <div class="content-wrapper">
+          
+          <!-- Page Header -->
+          <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
+            <h1 class="h2" id="pageTitle">
+              <? if (currentPage === 'dashboard') { ?>Dashboard
+              <? } else if (currentPage === 'pos') { ?>Punto de Venta
+              <? } else if (currentPage === 'barcode-scanner') { ?>Escanear Código de Barras
+              <? } else if (currentPage === 'inventory') { ?>Inventario
+              <? } else if (currentPage === 'clients') { ?>Clientes
+              <? } else if (currentPage === 'collections') { ?>Cobranzas
+              <? } else if (currentPage === 'cash') { ?>Caja
+              <? } else if (currentPage === 'reports') { ?>Reportes
+              <? } else if (currentPage === 'invoices') { ?>Facturas
+              <? } else if (currentPage === 'settings') { ?>Configuración
+              <? } else { ?>Adiction Boutique
+              <? } ?>
+            </h1>
+            <div class="btn-toolbar mb-2 mb-md-0">
+              <div class="btn-group me-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-calendar"></i> Hoy
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Dynamic Content Area -->
+          <div id="mainContent">
+            <!-- Content will be loaded dynamically based on currentPage -->
+            <? if (currentPage === 'dashboard') { ?>
+              <!-- Dashboard Content -->
+              <div class="row">
+                <div class="col-md-3">
+                  <div class="card text-white bg-primary mb-3 dashboard-card" style="cursor: pointer;" onclick="navigateTo('reports')">
+                    <div class="card-body">
+                      <h5 class="card-title"><i class="bi bi-cart-check"></i> Ventas Hoy</h5>
+                      <p class="card-text display-6" id="salesTodayAmount">S/ 0.00</p>
+                      <small class="text-white-50">Click para ver detalle</small>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card text-white bg-success mb-3 dashboard-card" style="cursor: pointer;" onclick="navigateTo('collections')">
+                    <div class="card-body">
+                      <h5 class="card-title"><i class="bi bi-cash-stack"></i> Cobros Hoy</h5>
+                      <p class="card-text display-6" id="collectionsTodayAmount">S/ 0.00</p>
+                      <small class="text-white-50">Click para ver detalle</small>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card text-white bg-warning mb-3 dashboard-card" style="cursor: pointer;" onclick="navigateToLowStock()">
+                    <div class="card-body">
+                      <h5 class="card-title"><i class="bi bi-exclamation-triangle"></i> Stock Bajo</h5>
+                      <p class="card-text display-6" id="lowStockCount">0</p>
+                      <small class="text-white-50">Click para ver detalle</small>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card text-white bg-danger mb-3 dashboard-card" style="cursor: pointer;" onclick="navigateToOverdue()">
+                    <div class="card-body">
+                      <h5 class="card-title"><i class="bi bi-clock-history"></i> Cuotas Vencidas</h5>
+                      <p class="card-text display-6" id="overdueCount">0</p>
+                      <small class="text-white-50">Click para ver detalle</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Example Table -->
+              <div class="card mt-4">
+                <div class="card-header">
+                  <h5 class="mb-0"><i class="bi bi-list-ul"></i> Últimas Ventas</h5>
+                </div>
+                <div class="card-body">
+                  <table id="exampleTable" class="table table-striped table-hover">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Fecha</th>
+                        <th>Cliente</th>
+                        <th>Tipo</th>
+                        <th>Total</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td colspan="7" class="text-center text-muted">
+                          <i class="bi bi-inbox"></i> No hay datos disponibles
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            <? } else if (currentPage === 'pos') { ?>
+              <?!= include('POS'); ?>
+            <? } else if (currentPage === 'barcode-scanner') { ?>
+              <?!= include('BarcodeScanner'); ?>
+            <? } else if (currentPage === 'inventory') { ?>
+              <?!= include('InventoryReport'); ?>
+            <? } else if (currentPage === 'clients') { ?>
+              <?!= include('ClientList'); ?>
+            <? } else if (currentPage === 'collections') { ?>
+              <?!= include('Collections'); ?>
+            <? } else if (currentPage === 'cash') { ?>
+              <?!= include('Cash'); ?>
+            <? } else if (currentPage === 'reports') { ?>
+              <?!= include('SalesReport'); ?>
+            <? } else if (currentPage === 'invoices') { ?>
+              <?!= include('InvoiceList'); ?>
+            <? } else if (currentPage === 'settings') { ?>
+              <div class="alert alert-info">
+                <h4><i class="bi bi-gear"></i> Configuración</h4>
+                <p>Módulo de configuración en desarrollo.</p>
+              </div>
+            <? } else { ?>
+              <div class="alert alert-warning">
+                <h4><i class="bi bi-exclamation-triangle"></i> Página no encontrada</h4>
+                <p>La página solicitada no existe.</p>
+              </div>
+            <? } ?>
+          </div>
+          
+        </div>
+      </main>
+      
+    </div>
+  </div>
+  
+  <!-- jQuery (required for DataTables) -->
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js" integrity="sha256-2Pmvv0kuTBOenSvLm6bvfBSSHrUJ+3A7x6P5Ebd07/g=" crossorigin="anonymous"></script>
+  
+  <!-- Bootstrap 5.3 JS Bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
+  
+  <!-- DataTables JS -->
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+  
+  <script>
+    // User data from server - CORREGIDO
+    const USER_DATA = {
+      name: '<?= userName ?>',
+      email: '<?= userEmail ?>',
+      // Usamos JSON.parse para convertir el string que viene del servidor en un objeto real
+      // Si userRoles está vacío o es inválido, usar array vacío por defecto
+      roles: (function() {
+        try {
+          const rolesStr = '<?!= userRoles ?>';
+          if (!rolesStr || rolesStr === '' || rolesStr === 'null' || rolesStr === 'undefined') {
+            return [];
+          }
+          const parsed = JSON.parse(rolesStr);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+          console.error('Error al parsear roles:', e);
+          return [];
+        }
+      })()
+    };
+    
+    // CRÍTICO: Usar la URL del script desde el servidor, NO window.location
+    // Esto asegura que siempre usemos la URL de producción correcta
+    // GLOBAL para que los módulos incluidos puedan acceder
+    window.SCRIPT_URL = '<?= scriptUrl ?>';
+    const SCRIPT_URL = window.SCRIPT_URL;
+    
+    // Current page from server
+    const CURRENT_PAGE = '<?= currentPage ?>';
+    
+    console.log('Script URL (desde servidor):', SCRIPT_URL);
+    console.log('Window location:', window.location.href);
+    console.log('User data:', USER_DATA);
+    
+    // Navigation function - CORREGIDA para usar SCRIPT_URL del servidor
+    // GLOBAL para que los módulos incluidos puedan acceder
+    window.navigateTo = function(page, params) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const sessionEmail = urlParams.get('sessionEmail');
+      
+      let newUrl = SCRIPT_URL + '?page=' + page;
+      
+      // Preservar sessionEmail si existe
+      if (sessionEmail) {
+        newUrl += '&sessionEmail=' + encodeURIComponent(sessionEmail);
+      }
+      
+      // Agregar parámetros adicionales si existen
+      if (params) {
+        for (const key in params) {
+          if (params.hasOwnProperty(key)) {
+            newUrl += '&' + key + '=' + encodeURIComponent(params[key]);
+          }
+        }
+      }
+      
+      console.log('Navegando a:', newUrl);
+      
+      // Redirección usando la URL correcta del servidor
+      window.top.location.href = newUrl;
+    };
+    
+    // Alias local para compatibilidad
+    const navigateTo = window.navigateTo;
+    
+    // Navegación específica para stock bajo
+    function navigateToLowStock() {
+      navigateTo('inventory', { filter: 'low_stock' });
+    }
+    
+    // Navegación específica para cuotas vencidas
+    function navigateToOverdue() {
+      navigateTo('collections', { tab: 'overdue' });
+    }
+    
+    // Cargar datos del dashboard
+    function loadDashboardData() {
+      if (CURRENT_PAGE !== 'dashboard') return;
+      
+      console.log('Cargando datos del dashboard...');
+      
+      // Usar google.script.run para llamar al servidor
+      google.script.run
+        .withSuccessHandler(function(response) {
+          console.log('Dashboard data recibida:', response);
+          
+          if (response && response.success) {
+            const data = response.data;
+            
+            // Actualizar cards
+            if (data.salesToday !== undefined) {
+              $('#salesTodayAmount').text('S/ ' + parseFloat(data.salesToday).toFixed(2));
+            }
+            if (data.collectionsToday !== undefined) {
+              $('#collectionsTodayAmount').text('S/ ' + parseFloat(data.collectionsToday).toFixed(2));
+            }
+            if (data.lowStockCount !== undefined) {
+              $('#lowStockCount').text(data.lowStockCount);
+            }
+            if (data.overdueCount !== undefined) {
+              $('#overdueCount').text(data.overdueCount);
+            }
+            
+            // Actualizar tabla de últimas ventas si hay datos
+            if (data.recentSales && data.recentSales.length > 0) {
+              updateRecentSalesTable(data.recentSales);
+            }
+          } else {
+            console.error('Error en respuesta del dashboard:', response.error);
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error al cargar datos del dashboard:', error);
+          // No mostrar alerta para no molestar al usuario, solo log
+        })
+        .getDashboardData();
+    }
+    
+    // Actualizar tabla de ventas recientes
+    function updateRecentSalesTable(sales) {
+      const tbody = $('#exampleTable tbody');
+      tbody.empty();
+      
+      if (sales.length === 0) {
+        tbody.append('<tr><td colspan="7" class="text-center text-muted"><i class="bi bi-inbox"></i> No hay ventas recientes</td></tr>');
+        return;
+      }
+      
+      sales.forEach(function(sale) {
+        const row = $('<tr>');
+        row.append('<td>' + sale.id + '</td>');
+        row.append('<td>' + sale.date + '</td>');
+        row.append('<td>' + sale.client + '</td>');
+        row.append('<td>' + sale.type + '</td>');
+        row.append('<td>S/ ' + parseFloat(sale.total).toFixed(2) + '</td>');
+        row.append('<td><span class="badge bg-' + (sale.status === 'COMPLETED' ? 'success' : 'warning') + '">' + sale.status + '</span></td>');
+        row.append('<td><button class="btn btn-sm btn-outline-primary" onclick="viewSale(\'' + sale.id + '\')"><i class="bi bi-eye"></i></button></td>');
+        tbody.append(row);
+      });
+    }
+    
+    // Ver detalle de venta
+    function viewSale(saleId) {
+      alert('Ver venta: ' + saleId + ' (funcionalidad pendiente)');
+    }
+    
+    // Initialize DataTables y UI
+    $(document).ready(function() {
+      console.log('Sistema cargado. Página actual:', CURRENT_PAGE);
+      console.log('Usuario:', USER_DATA);
+      
+      // Set active nav link en la sidebar
+      $('.sidebar .nav-link').each(function() {
+        const href = $(this).attr('href');
+        if (href && href.includes('page=' + CURRENT_PAGE)) {
+          $(this).addClass('active');
+        } else {
+          $(this).removeClass('active');
+        }
+      });
+      
+      // Cargar datos del dashboard si estamos en esa página
+      if (CURRENT_PAGE === 'dashboard') {
+        loadDashboardData();
+      }
+      
+      // Inicializar tablas si existen
+      if ($('#exampleTable').length > 0) {
+        const tableBody = $('#exampleTable tbody tr');
+        if (tableBody.length > 0 && !tableBody.first().find('td[colspan]').length) {
+          $('#exampleTable').DataTable({
+            language: {
+              url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
+            },
+            pageLength: 25,
+            lengthMenu: [[25, 50, 100], [25, 50, 100]],
+            responsive: true
+          });
+        }
+      }
+      
+      // Agregar efecto hover a las cards del dashboard
+      $('.dashboard-card').hover(
+        function() {
+          $(this).css('transform', 'scale(1.05)');
+          $(this).css('transition', 'transform 0.2s');
+        },
+        function() {
+          $(this).css('transform', 'scale(1)');
+        }
+      );
+    });
+  </script>
+  
+</body>
+</html>
+

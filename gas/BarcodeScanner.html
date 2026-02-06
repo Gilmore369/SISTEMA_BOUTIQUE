@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<!--
+  BarcodeScanner.html - Modal de Escaneo de Códigos de Barras
+  Adiction Boutique Suite
+  
+  Utiliza la cámara del dispositivo para escanear códigos de barras.
+  Requisitos: 6.2, 22.1, 22.2, 22.3, 22.4, 22.5
+-->
+<html lang="es-PE">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Escanear Código de Barras</title>
+  
+  <!-- Bootstrap 5.3 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.min.css">
+  
+  <style>
+    body {
+      background-color: #000;
+      color: #fff;
+    }
+    #scanner-container {
+      position: relative;
+      width: 100%;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+    #interactive {
+      width: 100%;
+      height: auto;
+    }
+    #interactive video {
+      width: 100%;
+      height: auto;
+    }
+    #interactive canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    .scanner-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 80%;
+      height: 60%;
+      border: 2px solid #0d6efd;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+      pointer-events: none;
+    }
+    .scanner-line {
+      position: absolute;
+      width: 100%;
+      height: 2px;
+      background: #0d6efd;
+      animation: scan 2s linear infinite;
+    }
+    @keyframes scan {
+      0% { top: 0; }
+      50% { top: 100%; }
+      100% { top: 0; }
+    }
+    .result-box {
+      background-color: rgba(13, 110, 253, 0.9);
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  
+  <div class="container-fluid py-4">
+    
+    <!-- Header -->
+    <div class="text-center mb-4">
+      <h3><i class="bi bi-upc-scan"></i> Escanear Código de Barras</h3>
+      <p class="text-muted">Apunte la cámara hacia el código de barras</p>
+    </div>
+    
+    <!-- Scanner Container -->
+    <div id="scanner-container">
+      <div id="interactive" class="viewport">
+        <div class="scanner-overlay">
+          <div class="scanner-line"></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Result Display -->
+    <div id="result-container" class="text-center mt-4" style="display: none;">
+      <div class="result-box">
+        <h5><i class="bi bi-check-circle"></i> Código Detectado</h5>
+        <h2 id="barcode-result" class="my-3"></h2>
+        <button type="button" class="btn btn-light" onclick="useBarcode()">
+          <i class="bi bi-check2"></i> Usar este código
+        </button>
+        <button type="button" class="btn btn-outline-light ms-2" onclick="restartScanner()">
+          <i class="bi bi-arrow-clockwise"></i> Escanear otro
+        </button>
+      </div>
+    </div>
+    
+    <!-- Controls -->
+    <div class="text-center mt-4">
+      <button type="button" class="btn btn-danger" onclick="closeScanner()">
+        <i class="bi bi-x-circle"></i> Cancelar
+      </button>
+    </div>
+    
+    <!-- Status Messages -->
+    <div id="status-message" class="alert alert-info text-center mt-4" role="alert">
+      <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+      Iniciando cámara...
+    </div>
+    
+  </div>
+  
+  <!-- jQuery -->
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- QuaggaJS - Barcode Scanner Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
+  
+  <script>
+    let detectedBarcode = null;
+    let isScanning = false;
+    
+    $(document).ready(function() {
+      initScanner();
+    });
+    
+    function initScanner() {
+      // Check if browser supports getUserMedia
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showError('Su navegador no soporta acceso a la cámara. Por favor use Chrome o Safari en un dispositivo móvil.');
+        return;
+      }
+      
+      // Initialize Quagga
+      Quagga.init({
+        inputStream: {
+          name: "Live",
+          type: "LiveStream",
+          target: document.querySelector('#interactive'),
+          constraints: {
+            width: 640,
+            height: 480,
+            facingMode: "environment" // Use back camera on mobile
+          }
+        },
+        decoder: {
+          readers: [
+            "code_128_reader",
+            "ean_reader",
+            "ean_8_reader",
+            "code_39_reader",
+            "code_39_vin_reader",
+            "codabar_reader",
+            "upc_reader",
+            "upc_e_reader",
+            "i2of5_reader"
+          ],
+          debug: {
+            showCanvas: true,
+            showPatches: false,
+            showFoundPatches: false,
+            showSkeleton: false,
+            showLabels: false,
+            showPatchLabels: false,
+            showRemainingPatchLabels: false,
+            boxFromPatches: {
+              showTransformed: false,
+              showTransformedBox: false,
+              showBB: false
+            }
+          }
+        },
+        locate: true,
+        locator: {
+          patchSize: "medium",
+          halfSample: true
+        },
+        numOfWorkers: 2,
+        frequency: 10
+      }, function(err) {
+        if (err) {
+          console.error('Error initializing Quagga:', err);
+          showError('Error al iniciar la cámara: ' + err.message);
+          return;
+        }
+        
+        console.log('Quagga initialized successfully');
+        Quagga.start();
+        isScanning = true;
+        
+        $('#status-message').html('<i class="bi bi-camera"></i> Cámara activa - Apunte al código de barras').removeClass('alert-info').addClass('alert-success');
+      });
+      
+      // Handle detected barcodes
+      Quagga.onDetected(function(result) {
+        if (!isScanning) return;
+        
+        const code = result.codeResult.code;
+        const format = result.codeResult.format;
+        
+        console.log('Barcode detected:', code, 'Format:', format);
+        
+        // Validate barcode (basic validation)
+        if (code && code.length >= 8) {
+          detectedBarcode = code;
+          showResult(code, format);
+        }
+      });
+    }
+    
+    function showResult(code, format) {
+      // Stop scanning
+      isScanning = false;
+      Quagga.stop();
+      
+      // Hide scanner, show result
+      $('#interactive').hide();
+      $('#status-message').hide();
+      $('#result-container').show();
+      $('#barcode-result').text(code);
+      
+      // Play success sound (optional)
+      playBeep();
+    }
+    
+    function useBarcode() {
+      if (!detectedBarcode) return;
+      
+      // Send barcode to parent window (if opened as popup)
+      if (window.opener) {
+        window.opener.postMessage({
+          type: 'barcode-scanned',
+          barcode: detectedBarcode
+        }, '*');
+        window.close();
+      } else {
+        // If not popup, redirect to POS with barcode
+        window.location.href = '?page=pos&barcode=' + detectedBarcode;
+      }
+    }
+    
+    function restartScanner() {
+      detectedBarcode = null;
+      $('#result-container').hide();
+      $('#interactive').show();
+      $('#status-message').show().html('<i class="bi bi-camera"></i> Cámara activa - Apunte al código de barras').removeClass('alert-danger').addClass('alert-success');
+      
+      Quagga.start();
+      isScanning = true;
+    }
+    
+    function closeScanner() {
+      if (isScanning) {
+        Quagga.stop();
+      }
+      
+      if (window.opener) {
+        window.close();
+      } else {
+        window.location.href = '?page=pos';
+      }
+    }
+    
+    function showError(message) {
+      $('#status-message').html('<i class="bi bi-exclamation-triangle"></i> ' + message).removeClass('alert-info').addClass('alert-danger');
+      $('#interactive').hide();
+    }
+    
+    function playBeep() {
+      // Create a simple beep sound using Web Audio API
+      try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+        
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.1);
+      } catch (e) {
+        console.log('Could not play beep sound:', e);
+      }
+    }
+    
+    // Handle messages from parent window
+    window.addEventListener('message', function(event) {
+      // Handle any messages if needed
+    });
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function() {
+      if (isScanning) {
+        Quagga.stop();
+      }
+    });
+  </script>
+  
+</body>
+</html>

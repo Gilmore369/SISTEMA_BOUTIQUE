@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<!--
+  ProductList.html - Vista de Listado de Productos
+  Adiction Boutique Suite
+  
+  Muestra el catálogo de productos con búsqueda, filtros y paginación.
+  Requisitos: 3.3, 28.1, 28.2, 28.3
+-->
+<html lang="es-PE">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Catálogo de Productos - Adiction Boutique</title>
+  
+  <!-- Bootstrap 5.3 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.min.css">
+  
+  <!-- DataTables Bootstrap 5 CSS -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+</head>
+<body>
+  
+  <div class="container-fluid py-4">
+    
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2><i class="bi bi-box-seam"></i> Catálogo de Productos</h2>
+      <button type="button" class="btn btn-primary" onclick="window.location.href='?page=producto-form'">
+        <i class="bi bi-plus-circle"></i> Nuevo Producto
+      </button>
+    </div>
+    
+    <!-- Filters Card -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label for="filterCategory" class="form-label">Categoría</label>
+            <select id="filterCategory" class="form-select">
+              <option value="">Todas las categorías</option>
+              <option value="Vestidos">Vestidos</option>
+              <option value="Blusas">Blusas</option>
+              <option value="Pantalones">Pantalones</option>
+              <option value="Faldas">Faldas</option>
+              <option value="Accesorios">Accesorios</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label for="filterStatus" class="form-label">Estado</label>
+            <select id="filterStatus" class="form-select">
+              <option value="">Todos</option>
+              <option value="true">Activos</option>
+              <option value="false">Inactivos</option>
+            </select>
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <button type="button" class="btn btn-secondary me-2" onclick="applyFilters()">
+              <i class="bi bi-funnel"></i> Aplicar Filtros
+            </button>
+            <button type="button" class="btn btn-outline-secondary" onclick="clearFilters()">
+              <i class="bi bi-x-circle"></i> Limpiar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Products Table Card -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-list-ul"></i> Listado de Productos</h5>
+      </div>
+      <div class="card-body">
+        <table id="productsTable" class="table table-striped table-hover">
+          <thead>
+            <tr>
+              <th>Código de Barras</th>
+              <th>Nombre</th>
+              <th>Descripción</th>
+              <th>Categoría</th>
+              <th>Precio</th>
+              <th>Stock Mín.</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Data will be loaded via AJAX -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+    
+  </div>
+  
+  <!-- jQuery -->
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- DataTables JS -->
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+  
+  <script>
+    let productsTable;
+    
+    $(document).ready(function() {
+      // Initialize DataTable
+      productsTable = $('#productsTable').DataTable({
+        language: {
+          url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
+        },
+        pageLength: 25,
+        lengthMenu: [[25, 50, 100], [25, 50, 100]],
+        responsive: true,
+        processing: true,
+        serverSide: false,
+        ajax: {
+          url: '<?= scriptUrl ?>',
+          type: 'POST',
+          data: function(d) {
+            d.action = 'getProducts';
+            d.category = $('#filterCategory').val();
+            d.status = $('#filterStatus').val();
+          },
+          dataSrc: function(json) {
+            if (!json.success) {
+              console.error('Error loading products:', json.error);
+              return [];
+            }
+            return json.data || [];
+          }
+        },
+        columns: [
+          { data: 'barcode' },
+          { data: 'name' },
+          { 
+            data: 'description',
+            render: function(data) {
+              if (!data) return '-';
+              return data.length > 50 ? data.substring(0, 50) + '...' : data;
+            }
+          },
+          { data: 'category' },
+          { 
+            data: 'price',
+            render: function(data) {
+              return 'S/ ' + parseFloat(data || 0).toFixed(2);
+            }
+          },
+          { data: 'min_stock' },
+          { 
+            data: 'active',
+            render: function(data) {
+              if (data === true || data === 'true' || data === 'TRUE') {
+                return '<span class="badge bg-success">Activo</span>';
+              } else {
+                return '<span class="badge bg-secondary">Inactivo</span>';
+              }
+            }
+          },
+          {
+            data: null,
+            orderable: false,
+            render: function(data, type, row) {
+              return `
+                <div class="btn-group btn-group-sm" role="group">
+                  <button type="button" class="btn btn-outline-primary" onclick="editProduct('${row.id}')" title="Editar">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button type="button" class="btn btn-outline-info" onclick="viewStock('${row.id}')" title="Ver Stock">
+                    <i class="bi bi-box"></i>
+                  </button>
+                </div>
+              `;
+            }
+          }
+        ],
+        order: [[1, 'asc']]
+      });
+    });
+    
+    function applyFilters() {
+      productsTable.ajax.reload();
+    }
+    
+    function clearFilters() {
+      $('#filterCategory').val('');
+      $('#filterStatus').val('');
+      productsTable.ajax.reload();
+    }
+    
+    function editProduct(productId) {
+      window.location.href = '?page=producto-form&id=' + productId;
+    }
+    
+    function viewStock(productId) {
+      window.location.href = '?page=stock-view&productId=' + productId;
+    }
+  </script>
+  
+</body>
+</html>

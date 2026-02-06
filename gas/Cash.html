@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gestión de Caja - Adiction Boutique Suite</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    .stat-card {
+      border-left: 4px solid #0d6efd;
+      transition: transform 0.2s;
+    }
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .stat-value {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #0d6efd;
+    }
+    .stat-label {
+      color: #6c757d;
+      font-size: 0.875rem;
+      text-transform: uppercase;
+    }
+    .shift-status {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 0.25rem;
+      font-weight: 500;
+      font-size: 0.875rem;
+    }
+    .shift-status.open {
+      background-color: #d1e7dd;
+      color: #0f5132;
+    }
+    .shift-status.closed {
+      background-color: #f8d7da;
+      color: #842029;
+    }
+    .difference-positive {
+      color: #198754;
+      font-weight: bold;
+    }
+    .difference-negative {
+      color: #dc3545;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h2><i class="bi bi-wallet2"></i> Gestión de Caja</h2>
+        <p class="text-muted mb-0">Control de turnos y efectivo</p>
+      </div>
+      <div>
+        <button id="btnOpenShift" class="btn btn-success" onclick="showOpenShiftModal()">
+          <i class="bi bi-unlock"></i> Abrir Turno
+        </button>
+        <button id="btnCloseShift" class="btn btn-danger" onclick="showCloseShiftModal()" style="display:none;">
+          <i class="bi bi-lock"></i> Cerrar Turno
+        </button>
+      </div>
+    </div>
+
+    <!-- Estado del Turno Actual -->
+    <div id="currentShiftSection" style="display:none;">
+      <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0"><i class="bi bi-clock-history"></i> Turno Actual</h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-3">
+              <p class="mb-1"><strong>Estado:</strong></p>
+              <span id="shiftStatus" class="shift-status open">ABIERTO</span>
+            </div>
+            <div class="col-md-3">
+              <p class="mb-1"><strong>Cajero:</strong></p>
+              <p id="shiftUser" class="mb-0">-</p>
+            </div>
+            <div class="col-md-3">
+              <p class="mb-1"><strong>Apertura:</strong></p>
+              <p id="shiftOpeningTime" class="mb-0">-</p>
+            </div>
+            <div class="col-md-3">
+              <p class="mb-1"><strong>Monto Inicial:</strong></p>
+              <p id="shiftOpeningAmount" class="mb-0">S/ 0.00</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resumen del Turno -->
+      <div class="row mb-4">
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body">
+              <p class="stat-label mb-2">Ventas Contado</p>
+              <p class="stat-value mb-0" id="statCashSales">S/ 0.00</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body">
+              <p class="stat-label mb-2">Cobros</p>
+              <p class="stat-value mb-0" id="statCollections">S/ 0.00</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card">
+            <div class="card-body">
+              <p class="stat-label mb-2">Egresos</p>
+              <p class="stat-value mb-0" id="statExpenses">S/ 0.00</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card stat-card" style="border-left-color: #198754;">
+            <div class="card-body">
+              <p class="stat-label mb-2">Efectivo Disponible</p>
+              <p class="stat-value mb-0" id="statAvailableCash" style="color: #198754;">S/ 0.00</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Botón Registrar Egreso -->
+      <div class="mb-4">
+        <button class="btn btn-warning" onclick="showExpenseModal()">
+          <i class="bi bi-dash-circle"></i> Registrar Egreso
+        </button>
+      </div>
+    </div>
+
+    <!-- Mensaje cuando no hay turno abierto -->
+    <div id="noShiftMessage" class="alert alert-info">
+      <i class="bi bi-info-circle"></i> No hay turno de caja abierto. Haga clic en "Abrir Turno" para comenzar.
+    </div>
+  </div>
+
+  <!-- Modal: Abrir Turno -->
+  <div class="modal fade" id="openShiftModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title"><i class="bi bi-unlock"></i> Abrir Turno de Caja</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="openShiftForm">
+            <div class="mb-3">
+              <label class="form-label">Tienda</label>
+              <select class="form-select" id="openStoreId" required>
+                <option value="">Seleccione...</option>
+                <option value="STORE_MUJERES">Adiction Boutique Mujeres</option>
+                <option value="STORE_HOMBRES">Adiction Boutique Hombres</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Monto Inicial en Caja</label>
+              <div class="input-group">
+                <span class="input-group-text">S/</span>
+                <input type="number" class="form-control" id="openingAmount" 
+                       min="0" step="0.01" required placeholder="0.00">
+              </div>
+              <div class="form-text">Ingrese el efectivo con el que inicia el turno</div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-success" onclick="openShift()">
+            <i class="bi bi-unlock"></i> Abrir Turno
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Cerrar Turno -->
+  <div class="modal fade" id="closeShiftModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title"><i class="bi bi-lock"></i> Cerrar Turno de Caja - Arqueo</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <!-- Resumen del Turno -->
+          <div class="card mb-3">
+            <div class="card-header">
+              <strong>Resumen del Turno</strong>
+            </div>
+            <div class="card-body">
+              <table class="table table-sm mb-0">
+                <tr>
+                  <td>Monto Inicial:</td>
+                  <td class="text-end"><strong id="closeOpeningAmount">S/ 0.00</strong></td>
+                </tr>
+                <tr>
+                  <td>Ventas al Contado:</td>
+                  <td class="text-end" id="closeCashSales">S/ 0.00</td>
+                </tr>
+                <tr>
+                  <td>Cobros de Crédito:</td>
+                  <td class="text-end" id="closeCollections">S/ 0.00</td>
+                </tr>
+                <tr>
+                  <td>Egresos:</td>
+                  <td class="text-end text-danger" id="closeExpenses">S/ 0.00</td>
+                </tr>
+                <tr class="table-primary">
+                  <td><strong>Monto Esperado:</strong></td>
+                  <td class="text-end"><strong id="closeExpectedAmount">S/ 0.00</strong></td>
+                </tr>
+              </table>
+            </div>
+          </div>
+
+          <!-- Arqueo -->
+          <form id="closeShiftForm">
+            <div class="mb-3">
+              <label class="form-label">Monto Real Contado en Caja</label>
+              <div class="input-group">
+                <span class="input-group-text">S/</span>
+                <input type="number" class="form-control" id="closingAmount" 
+                       min="0" step="0.01" required placeholder="0.00">
+              </div>
+              <div class="form-text">Cuente el efectivo físico en caja e ingrese el total</div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Supervisor que Autoriza</label>
+              <input type="email" class="form-control" id="supervisorId" required 
+                     placeholder="email@example.com">
+              <div class="form-text">Email del supervisor que autoriza el cierre</div>
+            </div>
+
+            <!-- Diferencia (se calcula automáticamente) -->
+            <div id="differenceSection" class="alert" style="display:none;">
+              <strong>Diferencia:</strong> 
+              <span id="differenceAmount" class="fs-5"></span>
+              <p id="differenceText" class="mb-0 mt-2"></p>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-danger" onclick="closeShift()">
+            <i class="bi bi-lock"></i> Cerrar Turno
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Registrar Egreso -->
+  <div class="modal fade" id="expenseModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-warning">
+          <h5 class="modal-title"><i class="bi bi-dash-circle"></i> Registrar Egreso</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="expenseForm">
+            <div class="mb-3">
+              <label class="form-label">Monto</label>
+              <div class="input-group">
+                <span class="input-group-text">S/</span>
+                <input type="number" class="form-control" id="expenseAmount" 
+                       min="0.01" step="0.01" required placeholder="0.00">
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Concepto</label>
+              <input type="text" class="form-control" id="expenseConcept" 
+                     required placeholder="Ej: Compra de insumos">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Categoría</label>
+              <select class="form-select" id="expenseCategory" required>
+                <option value="">Seleccione...</option>
+                <option value="OPERATIVO">Operativo</option>
+                <option value="MANTENIMIENTO">Mantenimiento</option>
+                <option value="SERVICIOS">Servicios</option>
+                <option value="OTROS">Otros</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Comprobante (opcional)</label>
+              <input type="file" class="form-control" id="expenseReceipt" 
+                     accept="image/*,application/pdf">
+              <div class="form-text">Foto o PDF del comprobante</div>
+            </div>
+            <div id="authSection" class="mb-3" style="display:none;">
+              <label class="form-label">Autorizado por (Supervisor)</label>
+              <input type="email" class="form-control" id="expenseAuthorizedBy" 
+                     placeholder="email@example.com">
+              <div class="form-text text-danger">
+                Este monto requiere autorización de supervisor
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-warning" onclick="recordExpense()">
+            <i class="bi bi-save"></i> Registrar Egreso
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    let currentShift = null;
+    let currentBalance = null;
+
+    // Cargar estado al iniciar
+    document.addEventListener('DOMContentLoaded', function() {
+      loadCurrentShift();
+    });
+
+    // Cargar turno actual
+    function loadCurrentShift() {
+      google.script.run
+        .withSuccessHandler(function(shift) {
+          if (shift) {
+            currentShift = shift;
+            showCurrentShift(shift);
+            loadShiftBalance(shift.id);
+          } else {
+            showNoShift();
+          }
+        })
+        .withFailureHandler(function(error) {
+          alert('Error al cargar turno: ' + error.message);
+        })
+        .getCurrentShift();
+    }
+
+    // Mostrar turno actual
+    function showCurrentShift(shift) {
+      document.getElementById('currentShiftSection').style.display = 'block';
+      document.getElementById('noShiftMessage').style.display = 'none';
+      document.getElementById('btnOpenShift').style.display = 'none';
+      document.getElementById('btnCloseShift').style.display = 'inline-block';
+
+      document.getElementById('shiftUser').textContent = shift.user_id;
+      document.getElementById('shiftOpeningTime').textContent = 
+        new Date(shift.opening_at).toLocaleString('es-PE');
+      document.getElementById('shiftOpeningAmount').textContent = 
+        'S/ ' + parseFloat(shift.opening_amount).toFixed(2);
+    }
+
+    // Mostrar mensaje sin turno
+    function showNoShift() {
+      document.getElementById('currentShiftSection').style.display = 'none';
+      document.getElementById('noShiftMessage').style.display = 'block';
+      document.getElementById('btnOpenShift').style.display = 'inline-block';
+      document.getElementById('btnCloseShift').style.display = 'none';
+    }
+
+    // Cargar balance del turno
+    function loadShiftBalance(shiftId) {
+      google.script.run
+        .withSuccessHandler(function(balance) {
+          currentBalance = balance;
+          updateBalanceDisplay(balance);
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error al cargar balance:', error);
+        })
+        .getShiftBalance(shiftId);
+    }
+
+    // Actualizar display del balance
+    function updateBalanceDisplay(balance) {
+      document.getElementById('statCashSales').textContent = 
+        'S/ ' + parseFloat(balance.cashSales).toFixed(2);
+      document.getElementById('statCollections').textContent = 
+        'S/ ' + parseFloat(balance.collections).toFixed(2);
+      document.getElementById('statExpenses').textContent = 
+        'S/ ' + parseFloat(balance.expenses).toFixed(2);
+      document.getElementById('statAvailableCash').textContent = 
+        'S/ ' + parseFloat(balance.availableCash).toFixed(2);
+    }
+
+    // Mostrar modal de apertura
+    function showOpenShiftModal() {
+      const modal = new bootstrap.Modal(document.getElementById('openShiftModal'));
+      modal.show();
+    }
+
+    // Abrir turno
+    function openShift() {
+      const form = document.getElementById('openShiftForm');
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+
+      const shiftData = {
+        storeId: document.getElementById('openStoreId').value,
+        openingAmount: parseFloat(document.getElementById('openingAmount').value)
+      };
+
+      google.script.run
+        .withSuccessHandler(function(shift) {
+          bootstrap.Modal.getInstance(document.getElementById('openShiftModal')).hide();
+          form.reset();
+          alert('Turno abierto exitosamente');
+          loadCurrentShift();
+        })
+        .withFailureHandler(function(error) {
+          alert('Error al abrir turno: ' + error.message);
+        })
+        .openShift(shiftData);
+    }
+
+    // Mostrar modal de cierre
+    function showCloseShiftModal() {
+      if (!currentBalance) {
+        alert('Cargando balance del turno...');
+        return;
+      }
+
+      // Llenar datos del resumen
+      document.getElementById('closeOpeningAmount').textContent = 
+        'S/ ' + parseFloat(currentBalance.openingAmount).toFixed(2);
+      document.getElementById('closeCashSales').textContent = 
+        'S/ ' + parseFloat(currentBalance.cashSales).toFixed(2);
+      document.getElementById('closeCollections').textContent = 
+        'S/ ' + parseFloat(currentBalance.collections).toFixed(2);
+      document.getElementById('closeExpenses').textContent = 
+        'S/ ' + parseFloat(currentBalance.expenses).toFixed(2);
+      document.getElementById('closeExpectedAmount').textContent = 
+        'S/ ' + parseFloat(currentBalance.availableCash).toFixed(2);
+
+      const modal = new bootstrap.Modal(document.getElementById('closeShiftModal'));
+      modal.show();
+    }
+
+    // Calcular diferencia al cambiar monto real
+    document.getElementById('closingAmount').addEventListener('input', function() {
+      const closingAmount = parseFloat(this.value) || 0;
+      const expectedAmount = currentBalance ? currentBalance.availableCash : 0;
+      const difference = closingAmount - expectedAmount;
+
+      const diffSection = document.getElementById('differenceSection');
+      const diffAmount = document.getElementById('differenceAmount');
+      const diffText = document.getElementById('differenceText');
+
+      if (this.value) {
+        diffSection.style.display = 'block';
+        diffAmount.textContent = 'S/ ' + Math.abs(difference).toFixed(2);
+        
+        if (difference > 0) {
+          diffSection.className = 'alert alert-success';
+          diffAmount.className = 'fs-5 difference-positive';
+          diffText.textContent = 'Hay un sobrante de efectivo';
+        } else if (difference < 0) {
+          diffSection.className = 'alert alert-danger';
+          diffAmount.className = 'fs-5 difference-negative';
+          diffText.textContent = 'Hay un faltante de efectivo';
+        } else {
+          diffSection.className = 'alert alert-info';
+          diffAmount.className = 'fs-5';
+          diffText.textContent = 'El efectivo cuadra perfectamente';
+        }
+      } else {
+        diffSection.style.display = 'none';
+      }
+    });
+
+    // Cerrar turno
+    function closeShift() {
+      const form = document.getElementById('closeShiftForm');
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+
+      if (!confirm('¿Está seguro de cerrar el turno? Esta acción no se puede deshacer.')) {
+        return;
+      }
+
+      const closingData = {
+        closingAmount: parseFloat(document.getElementById('closingAmount').value),
+        supervisorId: document.getElementById('supervisorId').value
+      };
+
+      google.script.run
+        .withSuccessHandler(function(shift) {
+          bootstrap.Modal.getInstance(document.getElementById('closeShiftModal')).hide();
+          form.reset();
+          alert('Turno cerrado exitosamente\n\n' +
+                'Monto esperado: S/ ' + parseFloat(shift.expected_amount).toFixed(2) + '\n' +
+                'Monto real: S/ ' + parseFloat(shift.closing_amount).toFixed(2) + '\n' +
+                'Diferencia: S/ ' + parseFloat(shift.difference).toFixed(2));
+          loadCurrentShift();
+        })
+        .withFailureHandler(function(error) {
+          alert('Error al cerrar turno: ' + error.message);
+        })
+        .closeShift(currentShift.id, closingData);
+    }
+
+    // Mostrar modal de egreso
+    function showExpenseModal() {
+      const modal = new bootstrap.Modal(document.getElementById('expenseModal'));
+      modal.show();
+    }
+
+    // Validar si requiere autorización
+    document.getElementById('expenseAmount').addEventListener('input', function() {
+      const amount = parseFloat(this.value) || 0;
+      const authSection = document.getElementById('authSection');
+      
+      // Umbral de 100 (debería venir de configuración)
+      if (amount > 100) {
+        authSection.style.display = 'block';
+        document.getElementById('expenseAuthorizedBy').required = true;
+      } else {
+        authSection.style.display = 'none';
+        document.getElementById('expenseAuthorizedBy').required = false;
+      }
+    });
+
+    // Registrar egreso
+    function recordExpense() {
+      const form = document.getElementById('expenseForm');
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+
+      const expenseData = {
+        shiftId: currentShift.id,
+        amount: parseFloat(document.getElementById('expenseAmount').value),
+        concept: document.getElementById('expenseConcept').value,
+        category: document.getElementById('expenseCategory').value,
+        authorizedBy: document.getElementById('expenseAuthorizedBy').value || null
+      };
+
+      google.script.run
+        .withSuccessHandler(function(expense) {
+          bootstrap.Modal.getInstance(document.getElementById('expenseModal')).hide();
+          form.reset();
+          alert('Egreso registrado exitosamente');
+          loadShiftBalance(currentShift.id);
+        })
+        .withFailureHandler(function(error) {
+          alert('Error al registrar egreso: ' + error.message);
+        })
+        .recordExpense(expenseData);
+    }
+  </script>
+</body>
+</html>

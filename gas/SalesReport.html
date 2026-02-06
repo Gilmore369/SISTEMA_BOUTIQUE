@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reporte de Ventas - Adiction Boutique Suite</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="container-fluid py-4">
+    <h2><i class="bi bi-graph-up"></i> Reporte de Ventas</h2>
+    <p class="text-muted">Análisis de ventas por período</p>
+
+    <!-- Filtros -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <form id="filterForm" class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">Fecha Inicio</label>
+            <input type="date" class="form-control" id="startDate" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Fecha Fin</label>
+            <input type="date" class="form-control" id="endDate" required>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Tienda</label>
+            <select class="form-select" id="storeId">
+              <option value="">Todas</option>
+              <option value="STORE_MUJERES">Mujeres</option>
+              <option value="STORE_HOMBRES">Hombres</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Tipo</label>
+            <select class="form-select" id="saleType">
+              <option value="">Todos</option>
+              <option value="CONTADO">Contado</option>
+              <option value="CREDITO">Crédito</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">&nbsp;</label>
+            <button type="submit" class="btn btn-primary w-100">
+              <i class="bi bi-search"></i> Generar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Métricas -->
+    <div id="metricsSection" style="display:none;">
+      <div class="row mb-4">
+        <div class="col-md-4">
+          <div class="card">
+            <div class="card-body">
+              <h6 class="text-muted">Total Ventas</h6>
+              <h3 id="metricTotalSales">0</h3>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card">
+            <div class="card-body">
+              <h6 class="text-muted">Monto Total</h6>
+              <h3 id="metricTotalAmount">S/ 0.00</h3>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card">
+            <div class="card-body">
+              <h6 class="text-muted">Ticket Promedio</h6>
+              <h3 id="metricAvgTicket">S/ 0.00</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gráfico -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">Tendencia de Ventas</h5>
+        </div>
+        <div class="card-body">
+          <canvas id="salesChart" height="80"></canvas>
+        </div>
+      </div>
+
+      <!-- Top Productos -->
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">Productos Más Vendidos</h5>
+        </div>
+        <div class="card-body">
+          <table id="topProductsTable" class="table table-striped">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Monto</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+  <script>
+    // Establecer fechas por defecto (último mes)
+    document.addEventListener('DOMContentLoaded', function() {
+      const today = new Date();
+      const lastMonth = new Date(today);
+      lastMonth.setMonth(lastMonth.getMonth() - 1);
+      
+      document.getElementById('endDate').valueAsDate = today;
+      document.getElementById('startDate').valueAsDate = lastMonth;
+    });
+
+    // Generar reporte
+    document.getElementById('filterForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      generateReport();
+    });
+
+    function generateReport() {
+      const filters = {
+        startDate: document.getElementById('startDate').value,
+        endDate: document.getElementById('endDate').value,
+        storeId: document.getElementById('storeId').value || null,
+        saleType: document.getElementById('saleType').value || null
+      };
+
+      google.script.run
+        .withSuccessHandler(displayReport)
+        .withFailureHandler(function(error) {
+          alert('Error al generar reporte: ' + error.message);
+        })
+        .getSalesReport(filters);
+    }
+
+    function displayReport(report) {
+      // Mostrar sección de métricas
+      document.getElementById('metricsSection').style.display = 'block';
+
+      // Actualizar métricas
+      document.getElementById('metricTotalSales').textContent = report.metrics.totalSales;
+      document.getElementById('metricTotalAmount').textContent = 
+        'S/ ' + report.metrics.totalAmount.toFixed(2);
+      document.getElementById('metricAvgTicket').textContent = 
+        'S/ ' + report.metrics.averageTicket.toFixed(2);
+
+      // Actualizar tabla de top productos
+      const tbody = document.querySelector('#topProductsTable tbody');
+      tbody.innerHTML = '';
+      
+      report.topProducts.forEach(function(product, index) {
+        const row = tbody.insertRow();
+        row.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${product.productName}</td>
+          <td>${product.quantity}</td>
+          <td>S/ ${product.amount.toFixed(2)}</td>
+        `;
+      });
+
+      // Crear gráfico simple (placeholder)
+      createSalesChart(report);
+    }
+
+    function createSalesChart(report) {
+      const ctx = document.getElementById('salesChart').getContext('2d');
+      
+      // Destruir gráfico anterior si existe
+      if (window.salesChart) {
+        window.salesChart.destroy();
+      }
+
+      // Crear gráfico simple de barras
+      window.salesChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['Ventas'],
+          datasets: [{
+            label: 'Monto Total',
+            data: [report.metrics.totalAmount],
+            backgroundColor: 'rgba(13, 110, 253, 0.5)',
+            borderColor: 'rgba(13, 110, 253, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>

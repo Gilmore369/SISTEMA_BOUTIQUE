@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log de Auditoría - Adiction Boutique</title>
+  <style>
+    .page-header {
+      margin-bottom: 30px;
+    }
+    
+    .filters-card {
+      margin-bottom: 20px;
+    }
+    
+    .operation-badge {
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.85em;
+      font-weight: 500;
+    }
+    
+    .op-create {
+      background-color: #d1e7dd;
+      color: #0f5132;
+    }
+    
+    .op-update {
+      background-color: #cfe2ff;
+      color: #084298;
+    }
+    
+    .op-delete {
+      background-color: #f8d7da;
+      color: #842029;
+    }
+    
+    .op-void {
+      background-color: #fff3cd;
+      color: #664d03;
+    }
+    
+    .op-other {
+      background-color: #e2e3e5;
+      color: #41464b;
+    }
+    
+    .details-cell {
+      max-width: 300px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    
+    .details-cell:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container-fluid">
+    <!-- Header -->
+    <div class="page-header">
+      <h2><i class="bi bi-shield-check"></i> Log de Auditoría</h2>
+      <p class="text-muted">Consulta el registro completo de operaciones del sistema</p>
+    </div>
+    
+    <!-- Filtros -->
+    <div class="card filters-card">
+      <div class="card-body">
+        <form id="filtersForm" class="row g-3">
+          <div class="col-md-3">
+            <label for="filterStartDate" class="form-label">Fecha Inicio</label>
+            <input type="date" class="form-control" id="filterStartDate">
+          </div>
+          
+          <div class="col-md-3">
+            <label for="filterEndDate" class="form-label">Fecha Fin</label>
+            <input type="date" class="form-control" id="filterEndDate">
+          </div>
+          
+          <div class="col-md-2">
+            <label for="filterUser" class="form-label">Usuario</label>
+            <input type="text" class="form-control" id="filterUser" placeholder="Email del usuario">
+          </div>
+          
+          <div class="col-md-2">
+            <label for="filterOperation" class="form-label">Operación</label>
+            <select class="form-select" id="filterOperation">
+              <option value="">Todas</option>
+              <option value="CREATE_SALE">Crear Venta</option>
+              <option value="VOID_SALE">Anular Venta</option>
+              <option value="APPLY_DISCOUNT">Aplicar Descuento</option>
+              <option value="RECORD_PAYMENT">Registrar Pago</option>
+              <option value="CREATE_CREDIT_PLAN">Crear Plan Crédito</option>
+              <option value="RESCHEDULE_INSTALLMENT">Reprogramar Cuota</option>
+              <option value="OPEN_SHIFT">Abrir Turno</option>
+              <option value="CLOSE_SHIFT">Cerrar Turno</option>
+              <option value="RECORD_EXPENSE">Registrar Egreso</option>
+              <option value="CREATE_PRODUCT">Crear Producto</option>
+              <option value="UPDATE_PRODUCT_PRICE">Cambiar Precio</option>
+              <option value="GENERATE_INVOICE">Generar Factura</option>
+              <option value="SEND_INVOICE">Enviar Factura</option>
+            </select>
+          </div>
+          
+          <div class="col-md-2">
+            <label for="filterEntity" class="form-label">Tipo Entidad</label>
+            <select class="form-select" id="filterEntity">
+              <option value="">Todos</option>
+              <option value="SALE">Venta</option>
+              <option value="PAYMENT">Pago</option>
+              <option value="CREDIT_PLAN">Plan Crédito</option>
+              <option value="INSTALLMENT">Cuota</option>
+              <option value="SHIFT">Turno Caja</option>
+              <option value="EXPENSE">Egreso</option>
+              <option value="PRODUCT">Producto</option>
+              <option value="INVOICE">Factura</option>
+              <option value="CLIENT">Cliente</option>
+            </select>
+          </div>
+          
+          <div class="col-md-12 d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-secondary" onclick="clearFilters()">
+              <i class="bi bi-x-circle"></i> Limpiar
+            </button>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-search"></i> Buscar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    
+    <!-- Tabla de Auditoría -->
+    <div class="card">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table id="auditTable" class="table table-striped table-hover table-sm">
+            <thead>
+              <tr>
+                <th>Fecha/Hora</th>
+                <th>Usuario</th>
+                <th>Operación</th>
+                <th>Tipo Entidad</th>
+                <th>ID Entidad</th>
+                <th>Detalles</th>
+              </tr>
+            </thead>
+            <tbody id="auditTableBody">
+              <!-- Datos cargados dinámicamente -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Modal para ver detalles -->
+  <div class="modal fade" id="detailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Detalles de Auditoría</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <strong>Fecha/Hora:</strong>
+              <p id="detailTimestamp"></p>
+            </div>
+            <div class="col-md-6">
+              <strong>Usuario:</strong>
+              <p id="detailUser"></p>
+            </div>
+          </div>
+          
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <strong>Operación:</strong>
+              <p id="detailOperation"></p>
+            </div>
+            <div class="col-md-6">
+              <strong>Tipo Entidad:</strong>
+              <p id="detailEntityType"></p>
+            </div>
+          </div>
+          
+          <div class="row mb-3">
+            <div class="col-md-12">
+              <strong>ID Entidad:</strong>
+              <p id="detailEntityId"></p>
+            </div>
+          </div>
+          
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <strong>Valores Anteriores:</strong>
+              <pre id="detailOldValues" class="bg-light p-2 rounded" style="max-height: 200px; overflow-y: auto;"></pre>
+            </div>
+            <div class="col-md-6">
+              <strong>Valores Nuevos:</strong>
+              <pre id="detailNewValues" class="bg-light p-2 rounded" style="max-height: 200px; overflow-y: auto;"></pre>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Variables globales
+    let auditData = [];
+    let dataTable = null;
+    
+    // Inicializar al cargar la página
+    document.addEventListener('DOMContentLoaded', function() {
+      // Establecer fechas por defecto (últimos 7 días)
+      const today = new Date();
+      const weekAgo = new Date(today);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      
+      document.getElementById('filterStartDate').value = weekAgo.toISOString().split('T')[0];
+      document.getElementById('filterEndDate').value = today.toISOString().split('T')[0];
+      
+      loadAuditLog();
+      setupEventListeners();
+    });
+    
+    // Configurar event listeners
+    function setupEventListeners() {
+      // Filtros
+      document.getElementById('filtersForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        loadAuditLog();
+      });
+    }
+    
+    // Cargar log de auditoría desde el servidor
+    function loadAuditLog() {
+      showLoading();
+      
+      // Obtener filtros
+      const filters = {
+        startDate: document.getElementById('filterStartDate').value,
+        endDate: document.getElementById('filterEndDate').value,
+        userId: document.getElementById('filterUser').value,
+        operation: document.getElementById('filterOperation').value,
+        entityType: document.getElementById('filterEntity').value
+      };
+      
+      google.script.run
+        .withSuccessHandler(function(response) {
+          hideLoading();
+          
+          if (response.success) {
+            auditData = response.data;
+            renderAuditTable(auditData);
+          } else {
+            showError('Error al cargar log de auditoría: ' + response.error);
+          }
+        })
+        .withFailureHandler(function(error) {
+          hideLoading();
+          showError('Error al cargar log de auditoría: ' + error.message);
+        })
+        .getAuditLog(filters);
+    }
+    
+    // Renderizar tabla de auditoría
+    function renderAuditTable(entries) {
+      const tbody = document.getElementById('auditTableBody');
+      tbody.innerHTML = '';
+      
+      if (entries.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No hay registros de auditoría para mostrar</td></tr>';
+        return;
+      }
+      
+      entries.forEach(function(entry) {
+        const row = document.createElement('tr');
+        
+        // Formatear fecha
+        const timestamp = new Date(entry.timestamp);
+        const formattedDate = timestamp.toLocaleString('es-PE');
+        
+        // Badge de operación
+        let operationBadge = getOperationBadge(entry.operation);
+        
+        // Detalles resumidos
+        let detailsSummary = '';
+        if (entry.new_values) {
+          try {
+            const newValues = JSON.parse(entry.new_values);
+            const keys = Object.keys(newValues);
+            if (keys.length > 0) {
+              detailsSummary = keys.slice(0, 2).join(', ');
+              if (keys.length > 2) {
+                detailsSummary += '...';
+              }
+            }
+          } catch (e) {
+            detailsSummary = 'Ver detalles';
+          }
+        }
+        
+        row.innerHTML = `
+          <td>${formattedDate}</td>
+          <td>${entry.user_id || '-'}</td>
+          <td>${operationBadge}</td>
+          <td>${entry.entity_type || '-'}</td>
+          <td>${entry.entity_id || '-'}</td>
+          <td class="details-cell" onclick="showDetails('${entry.id}')">${detailsSummary}</td>
+        `;
+        
+        tbody.appendChild(row);
+      });
+      
+      // Inicializar DataTable si no existe
+      if (!dataTable) {
+        dataTable = $('#auditTable').DataTable({
+          language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
+          },
+          pageLength: 25,
+          lengthMenu: [[25, 50, 100], [25, 50, 100]],
+          order: [[0, 'desc']] // Ordenar por fecha descendente
+        });
+      } else {
+        dataTable.clear();
+        dataTable.rows.add($(tbody).find('tr'));
+        dataTable.draw();
+      }
+    }
+    
+    // Obtener badge de operación
+    function getOperationBadge(operation) {
+      let badgeClass = 'op-other';
+      
+      if (operation.startsWith('CREATE')) {
+        badgeClass = 'op-create';
+      } else if (operation.startsWith('UPDATE')) {
+        badgeClass = 'op-update';
+      } else if (operation.startsWith('DELETE') || operation === 'VOID_SALE') {
+        badgeClass = 'op-delete';
+      } else if (operation.includes('VOID') || operation.includes('CANCEL')) {
+        badgeClass = 'op-void';
+      }
+      
+      return '<span class="operation-badge ' + badgeClass + '">' + operation + '</span>';
+    }
+    
+    // Mostrar detalles de una entrada
+    function showDetails(entryId) {
+      const entry = auditData.find(e => e.id === entryId);
+      
+      if (!entry) {
+        showError('Entrada de auditoría no encontrada');
+        return;
+      }
+      
+      // Llenar modal con detalles
+      document.getElementById('detailTimestamp').textContent = new Date(entry.timestamp).toLocaleString('es-PE');
+      document.getElementById('detailUser').textContent = entry.user_id || '-';
+      document.getElementById('detailOperation').textContent = entry.operation || '-';
+      document.getElementById('detailEntityType').textContent = entry.entity_type || '-';
+      document.getElementById('detailEntityId').textContent = entry.entity_id || '-';
+      
+      // Formatear valores anteriores
+      if (entry.old_values) {
+        try {
+          const oldValues = JSON.parse(entry.old_values);
+          document.getElementById('detailOldValues').textContent = JSON.stringify(oldValues, null, 2);
+        } catch (e) {
+          document.getElementById('detailOldValues').textContent = entry.old_values;
+        }
+      } else {
+        document.getElementById('detailOldValues').textContent = '-';
+      }
+      
+      // Formatear valores nuevos
+      if (entry.new_values) {
+        try {
+          const newValues = JSON.parse(entry.new_values);
+          document.getElementById('detailNewValues').textContent = JSON.stringify(newValues, null, 2);
+        } catch (e) {
+          document.getElementById('detailNewValues').textContent = entry.new_values;
+        }
+      } else {
+        document.getElementById('detailNewValues').textContent = '-';
+      }
+      
+      // Mostrar modal
+      const modal = new bootstrap.Modal(document.getElementById('detailsModal'));
+      modal.show();
+    }
+    
+    // Limpiar filtros
+    function clearFilters() {
+      document.getElementById('filterUser').value = '';
+      document.getElementById('filterOperation').value = '';
+      document.getElementById('filterEntity').value = '';
+      
+      // Restablecer fechas por defecto
+      const today = new Date();
+      const weekAgo = new Date(today);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      
+      document.getElementById('filterStartDate').value = weekAgo.toISOString().split('T')[0];
+      document.getElementById('filterEndDate').value = today.toISOString().split('T')[0];
+      
+      loadAuditLog();
+    }
+    
+    // Utilidades de UI
+    function showLoading() {
+      console.log('Loading...');
+    }
+    
+    function hideLoading() {
+      console.log('Loading complete');
+    }
+    
+    function showError(message) {
+      alert('Error: ' + message);
+    }
+  </script>
+</body>
+</html>
