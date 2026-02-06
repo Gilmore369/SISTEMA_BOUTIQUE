@@ -500,3 +500,95 @@ var LockManager = {
   }
   
 };
+
+
+// ============================================================================
+// SAFE RESPONSE - Conversión de Fechas para Evitar Error 500
+// ============================================================================
+
+/**
+ * safeResponse - Convierte todas las fechas a strings ISO
+ * 
+ * Esta función recorre recursivamente cualquier objeto o array y convierte
+ * TODAS las instancias de Date a strings ISO (.toISOString()).
+ * 
+ * Esto previene errores 500 cuando Apps Script intenta serializar fechas
+ * nativas de JavaScript para enviarlas al cliente.
+ * 
+ * @param {*} data - Datos a procesar (puede ser objeto, array, primitivo)
+ * @returns {*} Datos procesados con fechas convertidas a strings
+ * 
+ * @example
+ * const data = { date: new Date(), items: [{ created: new Date() }] };
+ * const safe = safeResponse(data);
+ * // Resultado: { date: "2026-02-06T...", items: [{ created: "2026-02-06T..." }] }
+ */
+function safeResponse(data) {
+  // Si es null o undefined, retornar tal cual
+  if (data === null || data === undefined) {
+    return data;
+  }
+  
+  // Si es una fecha, convertir a ISO string
+  if (data instanceof Date) {
+    return data.toISOString();
+  }
+  
+  // Si es un array, procesar cada elemento
+  if (Array.isArray(data)) {
+    return data.map(function(item) {
+      return safeResponse(item);
+    });
+  }
+  
+  // Si es un objeto (pero no Date ni Array), procesar cada propiedad
+  if (typeof data === 'object') {
+    const result = {};
+    for (const key in data) {
+      if (data.hasOwnProperty(key)) {
+        result[key] = safeResponse(data[key]);
+      }
+    }
+    return result;
+  }
+  
+  // Si es un primitivo (string, number, boolean), retornar tal cual
+  return data;
+}
+
+/**
+ * createSuccessResponse - Crea una respuesta exitosa segura
+ * 
+ * Envuelve los datos en un objeto de respuesta estándar y convierte
+ * todas las fechas a strings.
+ * 
+ * @param {*} data - Datos a retornar
+ * @returns {Object} Respuesta con formato { success: true, data: ... }
+ */
+function createSuccessResponse(data) {
+  return {
+    success: true,
+    ok: true,
+    data: safeResponse(data)
+  };
+}
+
+/**
+ * createErrorResponse - Crea una respuesta de error segura
+ * 
+ * @param {string} code - Código de error
+ * @param {string} message - Mensaje de error
+ * @param {*} details - Detalles adicionales (opcional)
+ * @returns {Object} Respuesta con formato { success: false, error: ... }
+ */
+function createErrorResponse(code, message, details) {
+  return {
+    success: false,
+    ok: false,
+    error: {
+      code: code || 'UNKNOWN_ERROR',
+      message: message || 'Error desconocido',
+      details: details || null
+    }
+  };
+}

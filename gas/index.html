@@ -350,12 +350,11 @@
     // Esto asegura que siempre usemos la URL de producción correcta
     // GLOBAL para que los módulos incluidos puedan acceder
     window.SCRIPT_URL = '<?= scriptUrl ?>';
-    const SCRIPT_URL = window.SCRIPT_URL;
     
     // Current page from server
     const CURRENT_PAGE = '<?= currentPage ?>';
     
-    console.log('Script URL (desde servidor):', SCRIPT_URL);
+    console.log('Script URL (desde servidor):', window.SCRIPT_URL);
     console.log('Window location:', window.location.href);
     console.log('User data:', USER_DATA);
     
@@ -365,7 +364,7 @@
       const urlParams = new URLSearchParams(window.location.search);
       const sessionEmail = urlParams.get('sessionEmail');
       
-      let newUrl = SCRIPT_URL + '?page=' + page;
+      let newUrl = window.SCRIPT_URL + '?page=' + page;
       
       // Preservar sessionEmail si existe
       if (sessionEmail) {

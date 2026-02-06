@@ -416,8 +416,12 @@ function routePost(requestData, userEmail) {
              action === 'getClientByDNI' || action === 'searchClients') {
       result = handleClientAction(action, payload, userEmail);
     }
-    // Crédito y Cobranzas
-    else if (action.startsWith('payment/') || action.startsWith('installment/')) {
+    // Crédito y Cobranzas (incluyendo acciones de Collections)
+    else if (action.startsWith('payment/') || action.startsWith('installment/') ||
+             action === 'getOverdueInstallments' || action === 'getTodayInstallments' ||
+             action === 'getWeekInstallments' || action === 'getCollectionsSummary' ||
+             action === 'getClientPendingInstallments' || action === 'registerPayment' ||
+             action === 'generateReceipt') {
       result = handleCreditAction(action, payload, userEmail, requestId);
     }
     // Caja
@@ -666,7 +670,11 @@ function handleInventoryAction(action, payload, userEmail, requestId) {
     // Generar reporte de inventario
     if (action === 'getInventoryReport') {
       const warehouseId = payload.warehouseId || null;
-      return getInventoryReport(warehouseId).data;
+      // getInventoryReport ya retorna createSuccessResponse, extraer solo data
+      const response = getInventoryReport(warehouseId);
+      // Como getInventoryReport retorna TextOutput, necesitamos parsear
+      const parsed = JSON.parse(response.getContent());
+      return parsed.data;
     }
     
     // Otras acciones de inventario (stub)
@@ -719,24 +727,9 @@ function handleClientAction(action, payload, userEmail) {
         });
       }
       
-      // CRÍTICO: Normalizar datos para JSON - convertir Date objects a strings
-      const normalizedClients = filteredClients.map(function(client) {
-        const normalized = {};
-        for (const key in client) {
-          if (client.hasOwnProperty(key)) {
-            const value = client[key];
-            // Convertir Date objects a ISO strings
-            if (value instanceof Date) {
-              normalized[key] = value.toISOString();
-            } else {
-              normalized[key] = value;
-            }
-          }
-        }
-        return normalized;
-      });
-      
-      return normalizedClients;
+      // CRÍTICO: safeResponse se encarga de convertir fechas automáticamente
+      // No necesitamos normalización manual
+      return filteredClients;
     }
     
     // Buscar cliente por ID
@@ -793,11 +786,69 @@ function handleClientAction(action, payload, userEmail) {
  * handleCreditAction - Maneja acciones de crédito y cobranzas
  */
 function handleCreditAction(action, payload, userEmail, requestId) {
-  // Stub - se implementará con CreditService
-  return {
-    action: action,
-    message: 'Funcionalidad de crédito pendiente de implementación'
-  };
+  try {
+    // Obtener cuotas vencidas
+    if (action === 'getOverdueInstallments') {
+      // TODO: Implementar con InstallmentRepository
+      // Por ahora retornar array vacío
+      return [];
+    }
+    
+    // Obtener cuotas que vencen hoy
+    else if (action === 'getTodayInstallments') {
+      // TODO: Implementar con InstallmentRepository
+      return [];
+    }
+    
+    // Obtener cuotas que vencen esta semana
+    else if (action === 'getWeekInstallments') {
+      // TODO: Implementar con InstallmentRepository
+      return [];
+    }
+    
+    // Obtener resumen de cobranzas
+    else if (action === 'getCollectionsSummary') {
+      // TODO: Implementar con PaymentRepository
+      return {
+        overdueCount: 0,
+        overdueAmount: 0,
+        todayCount: 0,
+        todayAmount: 0,
+        weekCount: 0,
+        weekAmount: 0
+      };
+    }
+    
+    // Obtener cuotas pendientes de un cliente
+    else if (action === 'getClientPendingInstallments') {
+      // TODO: Implementar con InstallmentRepository
+      return [];
+    }
+    
+    // Registrar pago
+    else if (action === 'registerPayment') {
+      // TODO: Implementar con CreditService
+      throw new Error('Funcionalidad de pagos será implementada en el siguiente milestone');
+    }
+    
+    // Generar recibo de pago
+    else if (action === 'generateReceipt') {
+      // TODO: Implementar generación de recibo
+      throw new Error('Funcionalidad de recibos será implementada en el siguiente milestone');
+    }
+    
+    // Acción no reconocida
+    else {
+      return {
+        action: action,
+        message: 'Funcionalidad de crédito pendiente de implementación'
+      };
+    }
+    
+  } catch (error) {
+    Logger.log('Error en handleCreditAction: ' + error.message);
+    throw error;
+  }
 }
 
 /**
@@ -1857,7 +1908,7 @@ function createSale(saleData, requestId) {
  * getInventoryReport - Genera reporte de inventario
  * 
  * @param {string} warehouseId - ID del almacén (opcional)
- * @returns {Object} Reporte de inventario
+ * @returns {Object} Reporte de inventario con safeResponse
  */
 function getInventoryReport(warehouseId) {
   try {
@@ -1930,25 +1981,18 @@ function getInventoryReport(warehouseId) {
     Logger.log('Stock bajo: ' + lowStockCount);
     Logger.log('=== getInventoryReport END ===');
     
-    return {
-      success: true,
-      data: report
-    };
+    // CRÍTICO: Usar createSuccessResponse para convertir fechas automáticamente
+    return createSuccessResponse(report);
     
   } catch (error) {
     Logger.log('ERROR en getInventoryReport: ' + error.message);
     Logger.log('Stack trace: ' + error.stack);
     
-    return {
-      success: false,
-      error: error.message,
-      data: {
-        totalProducts: 0,
-        totalValue: 0,
-        lowStockCount: 0,
-        inventory: []
-      }
-    };
+    return createErrorResponse(
+      'INVENTORY_ERROR',
+      'Error al generar reporte de inventario',
+      { originalError: error.message }
+    );
   }
 }
 
@@ -2106,26 +2150,18 @@ function getDashboardData() {
     
     Logger.log('=== getDashboardData END ===');
     
-    return {
-      success: true,
-      data: dashboardData
-    };
+    // CRÍTICO: Usar safeResponse para convertir todas las fechas a strings
+    return createSuccessResponse(dashboardData);
     
   } catch (error) {
     Logger.log('ERROR CRÍTICO en getDashboardData: ' + error.message);
     Logger.log('Stack trace: ' + error.stack);
     
-    return {
-      success: false,
-      error: error.message,
-      data: {
-        salesToday: 0,
-        collectionsToday: 0,
-        lowStockCount: 0,
-        overdueCount: 0,
-        recentSales: []
-      }
-    };
+    return createErrorResponse(
+      'DASHBOARD_ERROR',
+      'Error al obtener datos del dashboard',
+      { originalError: error.message }
+    );
   }
 }
 
@@ -2145,34 +2181,16 @@ function getClients() {
       return client.active === true || client.active === 'TRUE';
     });
     
-    // CRÍTICO: Normalizar datos para JSON - convertir Date objects a strings
-    const normalizedClients = activeClients.map(function(client) {
-      const normalized = {};
-      for (const key in client) {
-        if (client.hasOwnProperty(key)) {
-          const value = client[key];
-          // Convertir Date objects a ISO strings
-          if (value instanceof Date) {
-            normalized[key] = value.toISOString();
-          } else {
-            normalized[key] = value;
-          }
-        }
-      }
-      return normalized;
-    });
-    
-    return {
-      success: true,
-      data: normalizedClients
-    };
+    // CRÍTICO: Usar safeResponse para convertir todas las fechas a strings
+    return createSuccessResponse(activeClients);
     
   } catch (error) {
     Logger.log('Error in getClients: ' + error.message);
-    return {
-      success: false,
-      error: error.message
-    };
+    return createErrorResponse(
+      'CLIENTS_ERROR',
+      'Error al obtener clientes',
+      { originalError: error.message }
+    );
   }
 }
 

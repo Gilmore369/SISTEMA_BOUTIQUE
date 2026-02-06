@@ -318,13 +318,19 @@
   <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
   
   <script>
-    // CRÍTICO: Usar SCRIPT_URL del contexto global (definido en index.html)
-    // NO declarar con const/let/var para evitar error de redeclaración
-    if (typeof SCRIPT_URL === 'undefined') {
-      console.error('SCRIPT_URL no está definido. Las llamadas AJAX fallarán.');
-      var SCRIPT_URL = window.SCRIPT_URL || window.parent.SCRIPT_URL || '';
+    // CRÍTICO: Verificar que jQuery esté disponible
+    if (typeof jQuery === 'undefined') {
+      console.error('jQuery no está disponible para Collections');
     } else {
-      console.log('SCRIPT_URL disponible para Collections:', SCRIPT_URL);
+      console.log('jQuery disponible, inicializando Collections');
+    }
+    
+    // CRÍTICO: Usar window.SCRIPT_URL del contexto global (definido en index.html)
+    // NO redeclarar para evitar error
+    if (typeof window.SCRIPT_URL === 'undefined') {
+      console.error('window.SCRIPT_URL no está definido. Las llamadas AJAX fallarán.');
+    } else {
+      console.log('SCRIPT_URL disponible para Collections:', window.SCRIPT_URL);
     }
     
     let overdueTable, todayTable, weekTable;
@@ -398,7 +404,7 @@
         processing: true,
         serverSide: false,
         ajax: {
-          url: SCRIPT_URL,
+          url: window.SCRIPT_URL,
           type: 'POST',
           data: { action: 'getOverdueInstallments' },
           dataSrc: function(json) {
@@ -455,7 +461,7 @@
         processing: true,
         serverSide: false,
         ajax: {
-          url: SCRIPT_URL,
+          url: window.SCRIPT_URL,
           type: 'POST',
           data: { action: 'getTodayInstallments' },
           dataSrc: function(json) {
@@ -502,7 +508,7 @@
         processing: true,
         serverSide: false,
         ajax: {
-          url: SCRIPT_URL,
+          url: window.SCRIPT_URL,
           type: 'POST',
           data: { action: 'getWeekInstallments' },
           dataSrc: function(json) {
@@ -551,7 +557,7 @@
      */
     function loadSummary() {
       $.ajax({
-        url: SCRIPT_URL,
+        url: window.SCRIPT_URL,
         type: 'POST',
         data: { action: 'getCollectionsSummary' },
         success: function(response) {
@@ -628,7 +634,7 @@
       
       // Get client's pending installments
       $.ajax({
-        url: SCRIPT_URL,
+        url: window.SCRIPT_URL,
         type: 'POST',
         data: {
           action: 'getClientPendingInstallments',
@@ -699,7 +705,7 @@
       
       // Submit payment
       $.ajax({
-        url: SCRIPT_URL,
+        url: window.SCRIPT_URL,
         type: 'POST',
         data: {
           action: 'recordPayment',
@@ -812,7 +818,7 @@
       if (!email) return;
       
       $.ajax({
-        url: SCRIPT_URL,
+        url: window.SCRIPT_URL,
         type: 'POST',
         data: {
           action: 'emailReceipt',
@@ -853,3 +859,4 @@
   
 </body>
 </html>
+

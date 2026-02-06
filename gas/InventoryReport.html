@@ -105,9 +105,9 @@
   <script>
     // CRÍTICO: Usar SCRIPT_URL del contexto global (definido en index.html)
     // NO declarar con const/let/var para evitar error de redeclaración
-    if (typeof SCRIPT_URL === 'undefined') {
+    if (typeof window.SCRIPT_URL === 'undefined') {
       console.error('SCRIPT_URL no está definido. Las llamadas AJAX fallarán.');
-      var SCRIPT_URL = window.SCRIPT_URL || window.parent.SCRIPT_URL || '';
+      window.SCRIPT_URL = window.SCRIPT_URL || window.SCRIPT_URL || window.parent.SCRIPT_URL || '';
     } else {
       console.log('SCRIPT_URL disponible para Inventory:', SCRIPT_URL);
     }
@@ -125,7 +125,7 @@
       console.log('Generando reporte para almacén:', warehouseId);
 
       $.ajax({
-        url: SCRIPT_URL,
+        url: window.SCRIPT_URL,
         type: 'POST',
         data: {
           action: 'getInventoryReport',
@@ -207,3 +207,4 @@
   </script>
 </body>
 </html>
+

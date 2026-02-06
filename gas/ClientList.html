@@ -102,9 +102,9 @@
   <script>
     // CRÍTICO: Usar SCRIPT_URL del contexto global (definido en index.html)
     // NO declarar con const/let/var para evitar error de redeclaración
-    if (typeof SCRIPT_URL === 'undefined') {
+    if (typeof window.SCRIPT_URL === 'undefined') {
       console.error('SCRIPT_URL no está definido. Las llamadas AJAX fallarán.');
-      var SCRIPT_URL = window.SCRIPT_URL || window.parent.SCRIPT_URL || '';
+      window.SCRIPT_URL = window.SCRIPT_URL || window.SCRIPT_URL || window.parent.SCRIPT_URL || '';
     } else {
       console.log('SCRIPT_URL disponible para ClientList:', SCRIPT_URL);
     }
@@ -123,7 +123,7 @@
         processing: true,
         serverSide: false,
         ajax: {
-          url: SCRIPT_URL,
+          url: window.SCRIPT_URL,
           type: 'POST',
           data: function(d) {
             return {
@@ -252,13 +252,14 @@
     }
     
     function viewClient(clientId) {
-      window.location.href = SCRIPT_URL + '?page=cliente-detalle&id=' + clientId;
+      window.location.href = window.SCRIPT_URL + '?page=cliente-detalle&id=' + clientId;
     }
     
     function editClient(clientId) {
-      window.location.href = SCRIPT_URL + '?page=cliente-form&id=' + clientId;
+      window.location.href = window.SCRIPT_URL + '?page=cliente-form&id=' + clientId;
     }
   </script>
   
 </body>
 </html>
+
