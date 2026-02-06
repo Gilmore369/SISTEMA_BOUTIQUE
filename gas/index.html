@@ -325,8 +325,8 @@
   <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
   
   <script>
-    // User data from server - CORREGIDO
-    const USER_DATA = {
+    // User data from server - GLOBAL (DEBE estar antes de cualquier include)
+    window.USER_DATA = {
       name: '<?= userName ?>',
       email: '<?= userEmail ?>',
       // Usamos JSON.parse para convertir el string que viene del servidor en un objeto real
@@ -345,6 +345,8 @@
         }
       })()
     };
+    
+    console.log('✓ window.USER_DATA definido:', window.USER_DATA);
     
     // CRÍTICO: Usar la URL del script desde el servidor, NO window.location
     // Esto asegura que siempre usemos la URL de producción correcta
@@ -405,13 +407,31 @@
       
       console.log('Cargando datos del dashboard...');
       
-      // Usar google.script.run para llamar al servidor
-      google.script.run
-        .withSuccessHandler(function(response) {
+      // Usar AJAX en lugar de google.script.run para tener más control
+      $.ajax({
+        url: window.SCRIPT_URL,
+        type: 'POST',
+        data: {
+          action: 'getDashboardData',
+          userEmail: window.USER_DATA.email
+        },
+        success: function(response) {
           console.log('Dashboard data recibida:', response);
           
-          if (response && response.success) {
+          // Validar que response no sea null
+          if (!response) {
+            console.error('Response es null o undefined');
+            return;
+          }
+          
+          if (response.success || response.ok) {
             const data = response.data;
+            
+            // Validar que data no sea null
+            if (!data) {
+              console.error('response.data es null o undefined');
+              return;
+            }
             
             // Actualizar cards
             if (data.salesToday !== undefined) {
@@ -434,12 +454,13 @@
           } else {
             console.error('Error en respuesta del dashboard:', response.error);
           }
-        })
-        .withFailureHandler(function(error) {
-          console.error('Error al cargar datos del dashboard:', error);
-          // No mostrar alerta para no molestar al usuario, solo log
-        })
-        .getDashboardData();
+        },
+        error: function(xhr, status, error) {
+          console.error('Error AJAX al cargar dashboard:', error);
+          console.error('Status:', status);
+          console.error('Response:', xhr.responseText);
+        }
+      });
     }
     
     // Actualizar tabla de ventas recientes

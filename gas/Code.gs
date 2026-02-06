@@ -403,6 +403,11 @@ function routePost(requestData, userEmail) {
     if (action === ACTIONS.AUTH_CHECK || action === ACTIONS.AUTH_ME) {
       result = handleAuthAction(action, payload, userEmail);
     }
+    // Dashboard
+    else if (action === 'getDashboardData') {
+      // getDashboardData ya retorna createSuccessResponse, retornar directamente
+      return getDashboardData();
+    }
     // Productos (incluyendo acciones sin prefijo para compatibilidad con DataTables)
     else if (action.startsWith('product/') || action === 'getProducts' || action === 'getProduct' || 
              action === 'getProductByBarcode' || action === 'searchProducts' || 
@@ -795,40 +800,147 @@ function handleCreditAction(action, payload, userEmail, requestId) {
   try {
     // Obtener cuotas vencidas
     if (action === 'getOverdueInstallments') {
-      // TODO: Implementar con InstallmentRepository
-      // Por ahora retornar array vacío
-      return [];
+      const installmentRepo = new InstallmentRepository();
+      const overdueInstallments = installmentRepo.findOverdue();
+      
+      // Convertir a formato para DataTables
+      const data = overdueInstallments.map(function(inst) {
+        return {
+          id: inst.id,
+          plan_id: inst.plan_id,
+          client_id: inst.client_id,
+          client_name: inst.client_name || 'Cliente',
+          installment_number: inst.installment_number,
+          amount: parseFloat(inst.amount) || 0,
+          paid_amount: parseFloat(inst.paid_amount) || 0,
+          balance: parseFloat(inst.balance) || parseFloat(inst.amount) || 0,
+          due_date: inst.due_date,
+          status: inst.status,
+          days_overdue: calculateDaysOverdue(inst.due_date)
+        };
+      });
+      
+      return createSuccessResponse(data);
     }
     
     // Obtener cuotas que vencen hoy
     else if (action === 'getTodayInstallments') {
-      // TODO: Implementar con InstallmentRepository
-      return [];
+      const installmentRepo = new InstallmentRepository();
+      const todayInstallments = installmentRepo.findDueToday();
+      
+      const data = todayInstallments.map(function(inst) {
+        return {
+          id: inst.id,
+          plan_id: inst.plan_id,
+          client_id: inst.client_id,
+          client_name: inst.client_name || 'Cliente',
+          installment_number: inst.installment_number,
+          amount: parseFloat(inst.amount) || 0,
+          paid_amount: parseFloat(inst.paid_amount) || 0,
+          balance: parseFloat(inst.balance) || parseFloat(inst.amount) || 0,
+          due_date: inst.due_date,
+          status: inst.status
+        };
+      });
+      
+      return createSuccessResponse(data);
     }
     
     // Obtener cuotas que vencen esta semana
     else if (action === 'getWeekInstallments') {
-      // TODO: Implementar con InstallmentRepository
-      return [];
+      const installmentRepo = new InstallmentRepository();
+      const weekInstallments = installmentRepo.findDueThisWeek();
+      
+      const data = weekInstallments.map(function(inst) {
+        return {
+          id: inst.id,
+          plan_id: inst.plan_id,
+          client_id: inst.client_id,
+          client_name: inst.client_name || 'Cliente',
+          installment_number: inst.installment_number,
+          amount: parseFloat(inst.amount) || 0,
+          paid_amount: parseFloat(inst.paid_amount) || 0,
+          balance: parseFloat(inst.balance) || parseFloat(inst.amount) || 0,
+          due_date: inst.due_date,
+          status: inst.status
+        };
+      });
+      
+      return createSuccessResponse(data);
     }
     
     // Obtener resumen de cobranzas
     else if (action === 'getCollectionsSummary') {
-      // TODO: Implementar con PaymentRepository
-      return {
-        overdueCount: 0,
-        overdueAmount: 0,
-        todayCount: 0,
-        todayAmount: 0,
-        weekCount: 0,
-        weekAmount: 0
+      const installmentRepo = new InstallmentRepository();
+      
+      const overdueInstallments = installmentRepo.findOverdue();
+      const todayInstallments = installmentRepo.findDueToday();
+      const weekInstallments = installmentRepo.findDueThisWeek();
+      
+      // Calcular totales
+      let overdueAmount = 0;
+      overdueInstallments.forEach(function(inst) {
+        overdueAmount += parseFloat(inst.balance) || parseFloat(inst.amount) || 0;
+      });
+      
+      let todayAmount = 0;
+      todayInstallments.forEach(function(inst) {
+        todayAmount += parseFloat(inst.balance) || parseFloat(inst.amount) || 0;
+      });
+      
+      let weekAmount = 0;
+      weekInstallments.forEach(function(inst) {
+        weekAmount += parseFloat(inst.balance) || parseFloat(inst.amount) || 0;
+      });
+      
+      const summary = {
+        overdue: {
+          count: overdueInstallments.length,
+          amount: overdueAmount
+        },
+        today: {
+          count: todayInstallments.length,
+          amount: todayAmount
+        },
+        week: {
+          count: weekInstallments.length,
+          amount: weekAmount
+        }
       };
+      
+      return createSuccessResponse(summary);
     }
     
     // Obtener cuotas pendientes de un cliente
     else if (action === 'getClientPendingInstallments') {
-      // TODO: Implementar con InstallmentRepository
-      return [];
+      const clientId = payload.clientId;
+      if (!clientId) {
+        return createErrorResponse('VALIDATION_ERROR', 'clientId es requerido');
+      }
+      
+      const installmentRepo = new InstallmentRepository();
+      const allInstallments = installmentRepo.findAll();
+      
+      // Filtrar por cliente y estado pendiente
+      const clientInstallments = allInstallments.filter(function(inst) {
+        return inst.client_id === clientId && 
+               (inst.status === 'PENDING' || inst.status === 'PARTIAL' || inst.status === 'OVERDUE');
+      });
+      
+      const data = clientInstallments.map(function(inst) {
+        return {
+          id: inst.id,
+          plan_id: inst.plan_id,
+          installment_number: inst.installment_number,
+          amount: parseFloat(inst.amount) || 0,
+          paid_amount: parseFloat(inst.paid_amount) || 0,
+          balance: parseFloat(inst.balance) || parseFloat(inst.amount) || 0,
+          due_date: inst.due_date,
+          status: inst.status
+        };
+      });
+      
+      return createSuccessResponse(data);
     }
     
     // Registrar pago
@@ -845,16 +957,44 @@ function handleCreditAction(action, payload, userEmail, requestId) {
     
     // Acción no reconocida
     else {
-      return {
-        action: action,
-        message: 'Funcionalidad de crédito pendiente de implementación'
-      };
+      return createErrorResponse(
+        'INVALID_ACTION',
+        'Acción de crédito no reconocida: ' + action
+      );
     }
     
   } catch (error) {
     Logger.log('Error en handleCreditAction: ' + error.message);
-    throw error;
+    Logger.log('Stack: ' + error.stack);
+    
+    return createErrorResponse(
+      'CREDIT_ACTION_ERROR',
+      'Error al procesar acción de crédito: ' + error.message
+    );
   }
+}
+
+/**
+ * Calcula días de atraso de una cuota
+ */
+function calculateDaysOverdue(dueDate) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  let due = dueDate;
+  if (typeof due === 'string') {
+    due = new Date(due);
+  }
+  due.setHours(0, 0, 0, 0);
+  
+  if (due >= today) {
+    return 0;
+  }
+  
+  const diffTime = today - due;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  return diffDays;
 }
 
 /**
@@ -2019,7 +2159,7 @@ function getDashboardData() {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
     
-    // Inicializar datos
+    // Inicializar datos con valores por defecto
     const dashboardData = {
       salesToday: 0,
       collectionsToday: 0,
@@ -2028,10 +2168,14 @@ function getDashboardData() {
       recentSales: []
     };
     
+    Logger.log('Datos inicializados con valores por defecto');
+    
     // 1. Ventas de hoy
     try {
+      Logger.log('Obteniendo ventas...');
       const saleRepo = new SaleRepository();
       const allSales = saleRepo.findAll();
+      Logger.log('Total de ventas en BD: ' + allSales.length);
       
       let salesTodayTotal = 0;
       const recentSales = [];

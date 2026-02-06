@@ -318,26 +318,40 @@
   <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
   
   <script>
-    // CRÍTICO: Verificar que jQuery esté disponible
-    if (typeof jQuery === 'undefined') {
-      console.error('jQuery no está disponible para Collections');
-    } else {
-      console.log('jQuery disponible, inicializando Collections');
-    }
-    
-    // CRÍTICO: Usar window.SCRIPT_URL del contexto global (definido en index.html)
-    // NO redeclarar para evitar error
-    if (typeof window.SCRIPT_URL === 'undefined') {
-      console.error('window.SCRIPT_URL no está definido. Las llamadas AJAX fallarán.');
-    } else {
-      console.log('SCRIPT_URL disponible para Collections:', window.SCRIPT_URL);
+    // CRÍTICO: Esperar a que las variables globales estén disponibles
+    function waitForGlobals(callback) {
+      const maxAttempts = 50; // 5 segundos máximo
+      let attempts = 0;
+      
+      const checkInterval = setInterval(function() {
+        attempts++;
+        
+        // Verificar si las variables globales están disponibles
+        if (typeof window.SCRIPT_URL !== 'undefined' && 
+            typeof window.USER_DATA !== 'undefined' && 
+            typeof jQuery !== 'undefined') {
+          clearInterval(checkInterval);
+          console.log('✓ Variables globales disponibles para Collections');
+          console.log('  - SCRIPT_URL:', window.SCRIPT_URL);
+          console.log('  - USER_DATA:', window.USER_DATA);
+          callback();
+        } else if (attempts >= maxAttempts) {
+          clearInterval(checkInterval);
+          console.error('❌ Timeout esperando variables globales');
+          console.error('  - window.SCRIPT_URL:', typeof window.SCRIPT_URL);
+          console.error('  - window.USER_DATA:', typeof window.USER_DATA);
+          console.error('  - jQuery:', typeof jQuery);
+        }
+      }, 100); // Verificar cada 100ms
     }
     
     let overdueTable, todayTable, weekTable;
     let currentPaymentData = null;
     let currentReceiptId = null;
     
-    $(document).ready(function() {
+    // Esperar a que todo esté listo
+    waitForGlobals(function() {
+      $(document).ready(function() {
       // Initialize DataTables
       initializeTables();
       
@@ -349,6 +363,7 @@
         updateInstallmentsToPay();
       });
     });
+    }); // Cierre de waitForGlobals
     
     /**
      * Initialize DataTables

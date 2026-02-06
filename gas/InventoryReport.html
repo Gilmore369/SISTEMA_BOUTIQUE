@@ -103,50 +103,68 @@
   <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
   <script>
-    // CRÍTICO: Usar SCRIPT_URL del contexto global (definido en index.html)
-    // NO declarar con const/let/var para evitar error de redeclaración
-    if (typeof window.SCRIPT_URL === 'undefined') {
-      console.error('SCRIPT_URL no está definido. Las llamadas AJAX fallarán.');
-      window.SCRIPT_URL = window.SCRIPT_URL || window.SCRIPT_URL || window.parent.SCRIPT_URL || '';
-    } else {
-      console.log('SCRIPT_URL disponible para Inventory:', SCRIPT_URL);
+    // CRÍTICO: Esperar a que las variables globales estén disponibles
+    function waitForGlobals(callback, timeout) {
+      timeout = timeout || 5000; // 5 segundos por defecto
+      const startTime = Date.now();
+      
+      const checkInterval = setInterval(function() {
+        const elapsed = Date.now() - startTime;
+        
+        // Verificar si todas las variables globales están disponibles
+        if (window.SCRIPT_URL && window.USER_DATA && typeof jQuery !== 'undefined') {
+          clearInterval(checkInterval);
+          console.log('✓ Variables globales disponibles para InventoryReport');
+          callback();
+        } else if (elapsed > timeout) {
+          clearInterval(checkInterval);
+          console.error('✗ Timeout esperando variables globales para InventoryReport');
+          console.error('Estado:', {
+            SCRIPT_URL: !!window.SCRIPT_URL,
+            USER_DATA: !!window.USER_DATA,
+            jQuery: typeof jQuery !== 'undefined'
+          });
+        }
+      }, 50); // Verificar cada 50ms
     }
     
-    let inventoryDataTable = null;
+    // Esperar a que las variables globales estén disponibles antes de inicializar
+    waitForGlobals(function() {
+      let inventoryDataTable = null;
 
-    // Generar reporte al cargar
-    $(document).ready(function() {
-      generateReport();
-    });
-
-    function generateReport() {
-      const warehouseId = $('#warehouseId').val() || null;
-      
-      console.log('Generando reporte para almacén:', warehouseId);
-
-      $.ajax({
-        url: window.SCRIPT_URL,
-        type: 'POST',
-        data: {
-          action: 'getInventoryReport',
-          warehouseId: warehouseId,
-          userEmail: window.USER_DATA ? window.USER_DATA.email : ''
-        },
-        success: function(response) {
-          console.log('Respuesta del servidor:', response);
-          
-          if (response && (response.success || response.ok)) {
-            displayReport(response.data);
-          } else {
-            alert('Error al generar reporte: ' + (response.error || 'Error desconocido'));
-          }
-        },
-        error: function(xhr, status, error) {
-          console.error('Error AJAX:', error);
-          alert('Error de conexión al generar reporte: ' + error);
-        }
+      // Generar reporte al cargar
+      $(document).ready(function() {
+        generateReport();
       });
-    }
+
+      function generateReport() {
+        const warehouseId = $('#warehouseId').val() || null;
+        
+        console.log('Generando reporte para almacén:', warehouseId);
+
+        $.ajax({
+          url: window.SCRIPT_URL,
+          type: 'POST',
+          data: {
+            action: 'getInventoryReport',
+            warehouseId: warehouseId,
+            userEmail: window.USER_DATA ? window.USER_DATA.email : ''
+          },
+          success: function(response) {
+            console.log('Respuesta del servidor:', response);
+            
+            if (response && (response.success || response.ok)) {
+              displayReport(response.data);
+            } else {
+              alert('Error al generar reporte: ' + (response.error || 'Error desconocido'));
+            }
+          },
+          error: function(xhr, status, error) {
+            console.error('Error AJAX:', error);
+            alert('Error de conexión al generar reporte: ' + error);
+          }
+        });
+      }
 
     function displayReport(report) {
       console.log('Mostrando reporte:', report);
@@ -205,6 +223,11 @@
         order: [[4, 'desc']] // Ordenar por valor descendente
       });
     }
+    
+    // Hacer generateReport global para que se pueda llamar desde el botón
+    window.generateReport = generateReport;
+    
+    }); // Fin de waitForGlobals
   </script>
 </body>
 </html>
