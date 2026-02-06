@@ -433,7 +433,8 @@ function routePost(requestData, userEmail) {
              action === 'getWeekInstallments' || action === 'getCollectionsSummary' ||
              action === 'getClientPendingInstallments' || action === 'registerPayment' ||
              action === 'generateReceipt') {
-      result = handleCreditAction(action, payload, userEmail, requestId);
+      // handleCreditAction ya retorna createSuccessResponse, retornar directamente
+      return handleCreditAction(action, payload, userEmail, requestId);
     }
     // Caja
     else if (action.startsWith('shift/') || action.startsWith('expense/')) {
