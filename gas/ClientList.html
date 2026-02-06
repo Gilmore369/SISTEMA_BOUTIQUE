@@ -129,7 +129,8 @@
             return {
               action: 'getClients',
               search: $('#filterSearch').val(),
-              status: $('#filterStatus').val()
+              status: $('#filterStatus').val(),
+              userEmail: window.USER_DATA ? window.USER_DATA.email : ''
             };
           },
           dataSrc: function(json) {

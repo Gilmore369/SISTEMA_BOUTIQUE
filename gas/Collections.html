@@ -406,7 +406,10 @@
         ajax: {
           url: window.SCRIPT_URL,
           type: 'POST',
-          data: { action: 'getOverdueInstallments' },
+          data: { 
+            action: 'getOverdueInstallments',
+            userEmail: window.USER_DATA ? window.USER_DATA.email : ''
+          },
           dataSrc: function(json) {
             console.log('Respuesta overdue:', json);
             if (!json || (!json.success && !json.ok)) {
@@ -463,7 +466,10 @@
         ajax: {
           url: window.SCRIPT_URL,
           type: 'POST',
-          data: { action: 'getTodayInstallments' },
+          data: { 
+            action: 'getTodayInstallments',
+            userEmail: window.USER_DATA ? window.USER_DATA.email : ''
+          },
           dataSrc: function(json) {
             console.log('Respuesta today:', json);
             if (!json || (!json.success && !json.ok)) {
@@ -510,7 +516,10 @@
         ajax: {
           url: window.SCRIPT_URL,
           type: 'POST',
-          data: { action: 'getWeekInstallments' },
+          data: { 
+            action: 'getWeekInstallments',
+            userEmail: window.USER_DATA ? window.USER_DATA.email : ''
+          },
           dataSrc: function(json) {
             console.log('Respuesta week:', json);
             if (!json || (!json.success && !json.ok)) {
@@ -559,7 +568,10 @@
       $.ajax({
         url: window.SCRIPT_URL,
         type: 'POST',
-        data: { action: 'getCollectionsSummary' },
+        data: { 
+          action: 'getCollectionsSummary',
+          userEmail: window.USER_DATA ? window.USER_DATA.email : ''
+        },
         success: function(response) {
           console.log('Respuesta summary:', response);
           if (response && (response.success || response.ok) && response.data) {

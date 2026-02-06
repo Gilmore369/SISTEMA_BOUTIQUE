@@ -129,7 +129,8 @@
         type: 'POST',
         data: {
           action: 'getInventoryReport',
-          warehouseId: warehouseId
+          warehouseId: warehouseId,
+          userEmail: window.USER_DATA ? window.USER_DATA.email : ''
         },
         success: function(response) {
           console.log('Respuesta del servidor:', response);

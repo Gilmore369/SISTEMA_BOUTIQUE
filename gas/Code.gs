@@ -213,6 +213,12 @@ function doPost(e) {
       userEmail = '';
     }
     
+    // NUEVO: Intentar obtener email desde parámetros si Session falló
+    if (!userEmail && e.parameter && e.parameter.userEmail) {
+      userEmail = e.parameter.userEmail;
+      Logger.log('Email obtenido desde parámetros: ' + userEmail);
+    }
+    
     // Normalizar email
     if (userEmail) {
       userEmail = userEmail.trim().toLowerCase();
