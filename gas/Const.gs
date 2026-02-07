@@ -43,7 +43,14 @@ const SHEETS = {
   CFG_USERS: 'CFG_Users',
   CFG_PARAMS: 'CFG_Params',
   
-  // Catálogo
+  // Catálogo - Maestros
+  CAT_LINES: 'CAT_Lines',
+  CAT_CATEGORIES: 'CAT_Categories',
+  CAT_BRANDS: 'CAT_Brands',
+  CAT_SIZES: 'CAT_Sizes',
+  CAT_SUPPLIERS: 'CAT_Suppliers',
+  
+  // Catálogo - Productos
   CAT_PRODUCTS: 'CAT_Products',
   
   // Inventario

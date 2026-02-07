@@ -4449,3 +4449,362 @@ function getAuditLog(filters) {
     };
   }
 }
+
+
+// ============================================================================
+// BULK PRODUCT SERVICE - Ingreso Masivo de Productos
+// ============================================================================
+
+/**
+ * BulkProductService - Servicio para ingreso masivo de productos
+ * 
+ * Gestiona la creación masiva de productos con distribución de tallas,
+ * generación automática de códigos de barras y registro de movimientos de inventario.
+ * 
+ * Requisitos: Tarea 3 - Interfaz de Usuario para Ingreso Masivo
+ * 
+ * @class
+ */
+class BulkProductService {
+  
+  /**
+   * Constructor
+   * Inicializa los repositorios necesarios
+   */
+  constructor() {
+    this.productRepo = new ProductRepository();
+    this.stockRepo = new StockRepository();
+    this.movementRepo = new MovementRepository();
+    this.lineRepo = new LineRepository();
+    this.categoryRepo = new CategoryRepository();
+    this.brandRepo = new BrandRepository();
+    this.sizeRepo = new SizeRepository();
+    this.supplierRepo = new SupplierRepository();
+    this.auditRepo = new AuditRepository();
+  }
+  
+  /**
+   * createBulkProducts - Crea múltiples productos con distribución de tallas
+   * 
+   * Recibe los datos base del producto y un array de tallas con cantidades.
+   * Para cada talla/cantidad, genera:
+   * - Un producto único en CAT_Products con SKU y código de barras
+   * - Un registro de stock en INV_Stock
+   * - Un movimiento de entrada en INV_Movements
+   * 
+   * @param {Object} productData - Datos base del producto
+   * @param {string} productData.productName - Nombre del producto
+   * @param {string} productData.description - Descripción
+   * @param {string} productData.lineId - ID de la línea
+   * @param {string} productData.categoryId - ID de la categoría
+   * @param {string} productData.brandId - ID de la marca
+   * @param {string} productData.supplierId - ID del proveedor
+   * @param {string} productData.color - Color
+   * @param {string} productData.presentation - Presentación
+   * @param {string} productData.warehouseId - ID del almacén
+   * @param {number} productData.purchasePrice - Precio de compra
+   * @param {number} productData.salePrice - Precio de venta
+   * @param {Array<Object>} productData.sizes - Array de tallas con cantidades
+   * @param {string} userEmail - Email del usuario que realiza la operación
+   * @returns {Object} Resultado con productos creados y total de unidades
+   * @throws {Error} Si hay error en la validación o creación
+   */
+  createBulkProducts(productData, userEmail) {
+    try {
+      // Validar datos requeridos
+      this._validateBulkProductData(productData);
+      
+      // Obtener datos maestros para validación
+      const line = this.lineRepo.findById(productData.lineId);
+      const category = this.categoryRepo.findById(productData.categoryId);
+      const brand = this.brandRepo.findById(productData.brandId);
+      const supplier = this.supplierRepo.findById(productData.supplierId);
+      
+      if (!line || !category || !brand || !supplier) {
+        throw new Error('Datos maestros inválidos (línea, categoría, marca o proveedor no encontrados)');
+      }
+      
+      // Usar lock para operación atómica
+      return LockManager.withLock('bulk_product_creation', () => {
+        const createdProducts = [];
+        let totalUnits = 0;
+        
+        // Crear un producto por cada talla con cantidad
+        productData.sizes.forEach(sizeData => {
+          const size = this.sizeRepo.findById(sizeData.sizeId);
+          
+          if (!size) {
+            Logger.log('Talla no encontrada: ' + sizeData.sizeId + ', saltando...');
+            return;
+          }
+          
+          // Generar SKU y código de barras
+          const barcodeData = BarcodeGenerator.generateProductBarcode({
+            categoryId: category.name,
+            brandId: brand.name,
+            size: sizeData.sizeValue,
+            color: productData.color
+          });
+          
+          // Crear producto
+          const product = {
+            id: 'prod-' + new Date().getTime() + '-' + Math.random().toString(36).substr(2, 9),
+            barcode: barcodeData.sku,
+            name: productData.productName + ' - ' + sizeData.sizeValue + ' - ' + productData.color,
+            description: productData.description || '',
+            price: productData.salePrice,
+            category: category.name,
+            min_stock: 5, // Stock mínimo por defecto
+            active: true,
+            created_at: new Date(),
+            updated_at: new Date(),
+            // Nuevos campos de atributos
+            line_id: productData.lineId,
+            category_id: productData.categoryId,
+            brand_id: productData.brandId,
+            supplier_id: productData.supplierId,
+            size: sizeData.sizeValue,
+            color: productData.color,
+            presentation: productData.presentation || '',
+            purchase_price: productData.purchasePrice,
+            barcode_url: barcodeData.barcodeUrl
+          };
+          
+          // Guardar producto
+          const createdProduct = this.productRepo.create(product);
+          createdProducts.push(createdProduct);
+          
+          // Crear registro de stock inicial
+          const stockRecord = {
+            id: 'stock-' + new Date().getTime() + '-' + Math.random().toString(36).substr(2, 9),
+            warehouse_id: productData.warehouseId,
+            product_id: product.id,
+            quantity: sizeData.quantity,
+            min_stock: product.min_stock,
+            last_updated: new Date()
+          };
+          
+          this.stockRepo.create(stockRecord);
+          
+          // Registrar movimiento de entrada
+          const movement = {
+            id: 'mov-' + new Date().getTime() + '-' + Math.random().toString(36).substr(2, 9),
+            warehouse_id: productData.warehouseId,
+            product_id: product.id,
+            type: 'ENTRADA',
+            quantity: sizeData.quantity,
+            reference_id: 'BULK_ENTRY_' + new Date().getTime(),
+            user_id: userEmail,
+            reason: 'Ingreso masivo de mercadería - ' + supplier.name,
+            created_at: new Date()
+          };
+          
+          this.movementRepo.create(movement);
+          
+          totalUnits += sizeData.quantity;
+          
+          Logger.log('Producto creado: ' + product.name + ' (Cantidad: ' + sizeData.quantity + ')');
+        });
+        
+        // Auditar operación
+        this.auditRepo.log(
+          'BULK_PRODUCT_ENTRY',
+          'PRODUCT',
+          'BULK_' + new Date().getTime(),
+          null,
+          {
+            productsCreated: createdProducts.length,
+            totalUnits: totalUnits,
+            supplier: supplier.name,
+            brand: brand.name
+          },
+          userEmail
+        );
+        
+        Logger.log('Ingreso masivo completado: ' + createdProducts.length + ' productos, ' + totalUnits + ' unidades');
+        
+        return {
+          success: true,
+          productsCreated: createdProducts.length,
+          totalUnits: totalUnits,
+          products: createdProducts
+        };
+      });
+      
+    } catch (error) {
+      Logger.log('Error en createBulkProducts: ' + error.message);
+      throw new Error('Error al crear productos masivamente: ' + error.message);
+    }
+  }
+  
+  /**
+   * getMasterData - Obtiene datos maestros para el formulario
+   * 
+   * @param {string} type - Tipo de datos (lines, categories, brands, sizes, suppliers)
+   * @param {Object} filters - Filtros opcionales
+   * @returns {Array<Object>} Array de datos maestros
+   * @throws {Error} Si hay error al obtener los datos
+   */
+  getMasterData(type, filters) {
+    try {
+      switch (type) {
+        case 'lines':
+          return this.lineRepo.findActive();
+          
+        case 'categories':
+          if (filters && filters.lineId) {
+            return this.categoryRepo.findByLine(filters.lineId);
+          }
+          return this.categoryRepo.findActive();
+          
+        case 'brands':
+          return this.brandRepo.findActive();
+          
+        case 'sizes':
+          if (filters && filters.categoryId) {
+            return this.sizeRepo.findByCategory(filters.categoryId);
+          }
+          return [];
+          
+        case 'suppliers':
+          if (filters && filters.brandId) {
+            return this.supplierRepo.findByBrand(filters.brandId);
+          }
+          return this.supplierRepo.findActive();
+          
+        default:
+          throw new Error('Tipo de datos maestros no reconocido: ' + type);
+      }
+    } catch (error) {
+      Logger.log('Error en getMasterData: ' + error.message);
+      throw new Error('Error al obtener datos maestros: ' + error.message);
+    }
+  }
+  
+  /**
+   * _validateBulkProductData - Valida los datos del ingreso masivo
+   * 
+   * @private
+   * @param {Object} productData - Datos a validar
+   * @throws {Error} Si hay errores de validación
+   */
+  _validateBulkProductData(productData) {
+    // Validar campos requeridos
+    Validator.isRequired(productData.productName, 'Nombre del producto');
+    Validator.isRequired(productData.lineId, 'Línea');
+    Validator.isRequired(productData.categoryId, 'Categoría');
+    Validator.isRequired(productData.brandId, 'Marca');
+    Validator.isRequired(productData.supplierId, 'Proveedor');
+    Validator.isRequired(productData.color, 'Color');
+    Validator.isRequired(productData.warehouseId, 'Almacén');
+    
+    // Validar precios
+    Validator.isNumber(productData.purchasePrice, 'Precio de compra');
+    Validator.isPositive(productData.purchasePrice, 'Precio de compra');
+    Validator.isNumber(productData.salePrice, 'Precio de venta');
+    Validator.isPositive(productData.salePrice, 'Precio de venta');
+    
+    // Validar que el precio de venta sea mayor al de compra
+    if (productData.salePrice <= productData.purchasePrice) {
+      throw new Error('El precio de venta debe ser mayor al precio de compra');
+    }
+    
+    // Validar tallas
+    if (!productData.sizes || !Array.isArray(productData.sizes) || productData.sizes.length === 0) {
+      throw new Error('Debe especificar al menos una talla con cantidad');
+    }
+    
+    // Validar cada talla
+    productData.sizes.forEach((sizeData, index) => {
+      if (!sizeData.sizeId) {
+        throw new Error('Talla ' + (index + 1) + ': ID de talla es requerido');
+      }
+      
+      if (!sizeData.quantity || sizeData.quantity <= 0) {
+        throw new Error('Talla ' + (index + 1) + ': Cantidad debe ser mayor a 0');
+      }
+    });
+  }
+}
+
+/**
+ * testBulkProductService - Prueba el BulkProductService
+ */
+function testBulkProductService() {
+  Logger.log('=== Iniciando pruebas de BulkProductService ===');
+  
+  try {
+    const service = new BulkProductService();
+    
+    // Probar getMasterData
+    Logger.log('\n1. Probando getMasterData()...');
+    
+    const lines = service.getMasterData('lines');
+    Logger.log('✓ Líneas obtenidas: ' + lines.length);
+    
+    if (lines.length > 0) {
+      const categories = service.getMasterData('categories', { lineId: lines[0].id });
+      Logger.log('✓ Categorías obtenidas para línea ' + lines[0].name + ': ' + categories.length);
+      
+      if (categories.length > 0) {
+        const sizes = service.getMasterData('sizes', { categoryId: categories[0].id });
+        Logger.log('✓ Tallas obtenidas para categoría ' + categories[0].name + ': ' + sizes.length);
+      }
+    }
+    
+    const brands = service.getMasterData('brands');
+    Logger.log('✓ Marcas obtenidas: ' + brands.length);
+    
+    if (brands.length > 0) {
+      const suppliers = service.getMasterData('suppliers', { brandId: brands[0].id });
+      Logger.log('✓ Proveedores obtenidos para marca ' + brands[0].name + ': ' + suppliers.length);
+    }
+    
+    Logger.log('\n=== Pruebas de BulkProductService completadas ===');
+    Logger.log('NOTA: No se probó createBulkProducts para evitar crear datos de prueba');
+    
+  } catch (error) {
+    Logger.log('\n✗ Error en las pruebas: ' + error.message);
+    Logger.log('Stack trace: ' + error.stack);
+  }
+}
+
+// ============================================================================
+// FUNCIONES GLOBALES PARA LLAMADAS DESDE HTML
+// ============================================================================
+
+/**
+ * handleBulkProductAction - Maneja acciones del formulario de ingreso masivo
+ * 
+ * Esta función es llamada desde BulkProductEntry.html
+ * 
+ * @param {string} action - Acción a realizar (getMasterData, createBulkProducts)
+ * @param {Object} payload - Datos de la acción
+ * @returns {Object} Respuesta con formato estándar
+ */
+function handleBulkProductAction(action, payload) {
+  try {
+    const userEmail = Session.getActiveUser().getEmail();
+    const service = new BulkProductService();
+    
+    let result;
+    
+    if (action === 'getMasterData') {
+      result = service.getMasterData(payload.type, payload);
+    } else if (action === 'createBulkProducts') {
+      result = service.createBulkProducts(payload, userEmail);
+    } else {
+      throw new Error('Acción no reconocida: ' + action);
+    }
+    
+    return createSuccessResponse(result);
+    
+  } catch (error) {
+    Logger.log('Error en handleBulkProductAction: ' + error.message);
+    return createErrorResponse(
+      ERROR_CODES.SYSTEM_ERROR,
+      error.message,
+      null
+    );
+  }
+}

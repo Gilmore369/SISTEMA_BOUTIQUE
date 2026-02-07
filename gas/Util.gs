@@ -592,3 +592,180 @@ function createErrorResponse(code, message, details) {
     }
   };
 }
+
+
+// ============================================================================
+// BARCODE GENERATOR - Generación de Códigos de Barras
+// ============================================================================
+
+/**
+ * BarcodeGenerator - Generador de URLs de códigos de barras
+ * 
+ * Utiliza la API de Google Charts para generar códigos de barras en formato Code128.
+ * Los códigos se generan como URLs que pueden ser usadas directamente en <img> tags.
+ * 
+ * Requisitos: Tarea 4 - Digitalización
+ */
+var BarcodeGenerator = {
+  
+  /**
+   * generateBarcodeUrl - Genera URL de código de barras usando Google Charts API
+   * 
+   * @param {string} code - Código a convertir en barcode (SKU, ID, etc.)
+   * @param {Object} options - Opciones de configuración (opcional)
+   * @param {number} options.width - Ancho en píxeles (default: 200)
+   * @param {number} options.height - Alto en píxeles (default: 80)
+   * @returns {string} URL del código de barras generado
+   * @throws {Error} Si el código es inválido
+   * 
+   * @example
+   * const url = BarcodeGenerator.generateBarcodeUrl('PROD-001-M-AZUL');
+   * // Retorna: https://chart.googleapis.com/chart?cht=qr&chs=200x80&chl=PROD-001-M-AZUL
+   */
+  generateBarcodeUrl: function(code, options) {
+    try {
+      // Validar código
+      if (!code || typeof code !== 'string' || code.trim() === '') {
+        throw new Error('El código es requerido y debe ser un string válido');
+      }
+      
+      // Opciones por defecto
+      const width = (options && options.width) || 200;
+      const height = (options && options.height) || 80;
+      
+      // Limpiar código (remover caracteres especiales que puedan causar problemas en URL)
+      const cleanCode = encodeURIComponent(code.trim());
+      
+      // Generar URL usando Google Charts API
+      // Formato: Code128 (cht=qr para QR, pero usaremos formato simple)
+      // Nota: Google Charts API tiene limitaciones, para producción considerar usar una API dedicada
+      const baseUrl = 'https://chart.googleapis.com/chart';
+      const params = [
+        'cht=qr',  // Tipo: QR code (más versátil que barcode lineal)
+        'chs=' + width + 'x' + height,  // Tamaño
+        'chl=' + cleanCode  // Contenido
+      ];
+      
+      const url = baseUrl + '?' + params.join('&');
+      
+      Logger.log('Código de barras generado para: ' + code);
+      Logger.log('URL: ' + url);
+      
+      return url;
+      
+    } catch (error) {
+      Logger.log('Error en generateBarcodeUrl: ' + error.message);
+      throw new Error('Error al generar código de barras: ' + error.message);
+    }
+  },
+  
+  /**
+   * generateSKU - Genera un SKU único para un producto
+   * 
+   * Formato: {CATEGORY_PREFIX}-{BRAND_PREFIX}-{SIZE}-{COLOR}-{TIMESTAMP}
+   * Ejemplo: BLU-ZAR-M-AZUL-1707234567
+   * 
+   * @param {Object} productData - Datos del producto
+   * @param {string} productData.categoryId - ID de la categoría
+   * @param {string} productData.brandId - ID de la marca
+   * @param {string} productData.size - Talla
+   * @param {string} productData.color - Color
+   * @returns {string} SKU generado
+   * @throws {Error} Si faltan datos requeridos
+   */
+  generateSKU: function(productData) {
+    try {
+      // Validar datos requeridos
+      if (!productData) {
+        throw new Error('productData es requerido');
+      }
+      
+      // Generar prefijos (primeras 3 letras en mayúsculas)
+      const categoryPrefix = (productData.categoryId || 'CAT').substring(0, 3).toUpperCase();
+      const brandPrefix = (productData.brandId || 'BRD').substring(0, 3).toUpperCase();
+      const size = (productData.size || 'STD').toUpperCase();
+      const color = (productData.color || 'DEF').substring(0, 4).toUpperCase();
+      
+      // Timestamp para unicidad
+      const timestamp = new Date().getTime().toString().substring(5); // Últimos 8 dígitos
+      
+      // Generar SKU
+      const sku = [categoryPrefix, brandPrefix, size, color, timestamp].join('-');
+      
+      Logger.log('SKU generado: ' + sku);
+      
+      return sku;
+      
+    } catch (error) {
+      Logger.log('Error en generateSKU: ' + error.message);
+      throw new Error('Error al generar SKU: ' + error.message);
+    }
+  },
+  
+  /**
+   * generateProductBarcode - Genera código de barras completo para un producto
+   * 
+   * Genera tanto el SKU como la URL del código de barras.
+   * 
+   * @param {Object} productData - Datos del producto
+   * @returns {Object} {sku: string, barcodeUrl: string}
+   * @throws {Error} Si hay error al generar
+   */
+  generateProductBarcode: function(productData) {
+    try {
+      // Generar SKU
+      const sku = this.generateSKU(productData);
+      
+      // Generar URL del código de barras
+      const barcodeUrl = this.generateBarcodeUrl(sku);
+      
+      return {
+        sku: sku,
+        barcodeUrl: barcodeUrl
+      };
+      
+    } catch (error) {
+      Logger.log('Error en generateProductBarcode: ' + error.message);
+      throw error;
+    }
+  }
+  
+};
+
+/**
+ * testBarcodeGenerator - Prueba el generador de códigos de barras
+ */
+function testBarcodeGenerator() {
+  Logger.log('=== Iniciando pruebas de BarcodeGenerator ===');
+  
+  try {
+    // Probar generación de SKU
+    Logger.log('\n1. Probando generateSKU()...');
+    const productData = {
+      categoryId: 'cat_001',
+      brandId: 'brand_003',
+      size: 'M',
+      color: 'Azul'
+    };
+    
+    const sku = BarcodeGenerator.generateSKU(productData);
+    Logger.log('✓ SKU generado: ' + sku);
+    
+    // Probar generación de URL de código de barras
+    Logger.log('\n2. Probando generateBarcodeUrl()...');
+    const barcodeUrl = BarcodeGenerator.generateBarcodeUrl(sku);
+    Logger.log('✓ URL generada: ' + barcodeUrl);
+    
+    // Probar generación completa
+    Logger.log('\n3. Probando generateProductBarcode()...');
+    const result = BarcodeGenerator.generateProductBarcode(productData);
+    Logger.log('✓ SKU: ' + result.sku);
+    Logger.log('✓ URL: ' + result.barcodeUrl);
+    
+    Logger.log('\n=== Pruebas de BarcodeGenerator completadas ===');
+    
+  } catch (error) {
+    Logger.log('\n✗ Error en las pruebas: ' + error.message);
+    Logger.log('Stack trace: ' + error.stack);
+  }
+}

@@ -223,17 +223,38 @@ function setupSheetsWithSpreadsheet(ss) {
   // Crear todas las hojas en orden
   createCFGUsersSheet(ss);
   createCFGParamsSheet(ss);
+  
+  // Hojas maestras de catálogo
+  createCATLinesSheet(ss);
+  createCATCategoriesSheet(ss);
+  createCATBrandsSheet(ss);
+  createCATSizesSheet(ss);
+  createCATSuppliersSheet(ss);
+  
+  // Productos
   createCATProductsSheet(ss);
+  
+  // Inventario
   createINVStockSheet(ss);
   createINVMovementsSheet(ss);
+  
+  // CRM
   createCRMClientsSheet(ss);
+  
+  // POS
   createPOSSalesSheet(ss);
   createPOSSaleItemsSheet(ss);
+  
+  // Crédito
   createCRDPlansSheet(ss);
   createCRDInstallmentsSheet(ss);
   createCRDPaymentsSheet(ss);
+  
+  // Caja
   createCASHShiftsSheet(ss);
   createCASHExpensesSheet(ss);
+  
+  // Auditoría
   createAUDLogSheet(ss);
   
   Logger.log('Configuración completada exitosamente!');
@@ -241,7 +262,7 @@ function setupSheetsWithSpreadsheet(ss) {
   // Intentar mostrar alerta solo si UI está disponible
   try {
     const ui = SpreadsheetApp.getUi();
-    ui.alert('✅ Configuración completada!\n\nSe han creado 14 hojas con sus headers y formato.');
+    ui.alert('✅ Configuración completada!\n\nSe han creado 19 hojas con sus headers y formato.');
   } catch (e) {
     Logger.log('UI no disponible - configuración completada sin alerta visual');
   }
@@ -329,25 +350,148 @@ function createCFGParamsSheet(ss) {
 }
 
 /**
- * 3. CAT_Products - Catálogo de productos
+ * 2.1 CAT_Lines - Líneas de productos (Hombres, Mujeres, Niños)
  */
-function createCATProductsSheet(ss) {
-  const sheet = getOrCreateSheet(ss, 'CAT_Products');
+function createCATLinesSheet(ss) {
+  const sheet = getOrCreateSheet(ss, 'CAT_Lines');
   
   // Headers
-  const headers = ['id', 'barcode', 'name', 'description', 'price', 'category', 'min_stock', 'active', 'created_at', 'updated_at'];
+  const headers = ['id', 'name', 'active', 'created_at'];
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   
   // Formato
   formatHeaders(sheet, headers.length);
-  setColumnWidths(sheet, [200, 150, 200, 300, 100, 120, 100, 80, 150, 150]);
+  setColumnWidths(sheet, [150, 200, 80, 150]);
   
-  // Formato de moneda para precio
-  const priceRange = sheet.getRange(2, 5, 1000);
+  // Validación de datos para columna 'active'
+  const activeRange = sheet.getRange(2, 3, 1000);
+  const activeRule = SpreadsheetApp.newDataValidation()
+    .requireCheckbox()
+    .build();
+  activeRange.setDataValidation(activeRule);
+}
+
+/**
+ * 2.2 CAT_Categories - Categorías de productos
+ */
+function createCATCategoriesSheet(ss) {
+  const sheet = getOrCreateSheet(ss, 'CAT_Categories');
+  
+  // Headers
+  const headers = ['id', 'name', 'line_id', 'active', 'created_at'];
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  
+  // Formato
+  formatHeaders(sheet, headers.length);
+  setColumnWidths(sheet, [150, 200, 150, 80, 150]);
+  
+  // Validación de datos para columna 'active'
+  const activeRange = sheet.getRange(2, 4, 1000);
+  const activeRule = SpreadsheetApp.newDataValidation()
+    .requireCheckbox()
+    .build();
+  activeRange.setDataValidation(activeRule);
+}
+
+/**
+ * 2.3 CAT_Brands - Marcas
+ */
+function createCATBrandsSheet(ss) {
+  const sheet = getOrCreateSheet(ss, 'CAT_Brands');
+  
+  // Headers
+  const headers = ['id', 'name', 'active', 'created_at'];
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  
+  // Formato
+  formatHeaders(sheet, headers.length);
+  setColumnWidths(sheet, [150, 200, 80, 150]);
+  
+  // Validación de datos para columna 'active'
+  const activeRange = sheet.getRange(2, 3, 1000);
+  const activeRule = SpreadsheetApp.newDataValidation()
+    .requireCheckbox()
+    .build();
+  activeRange.setDataValidation(activeRule);
+}
+
+/**
+ * 2.4 CAT_Sizes - Tallas por categoría
+ */
+function createCATSizesSheet(ss) {
+  const sheet = getOrCreateSheet(ss, 'CAT_Sizes');
+  
+  // Headers
+  const headers = ['id', 'category_id', 'value', 'sort_order', 'active', 'created_at'];
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  
+  // Formato
+  formatHeaders(sheet, headers.length);
+  setColumnWidths(sheet, [150, 150, 100, 100, 80, 150]);
+  
+  // Validación de datos para columna 'active'
+  const activeRange = sheet.getRange(2, 5, 1000);
+  const activeRule = SpreadsheetApp.newDataValidation()
+    .requireCheckbox()
+    .build();
+  activeRange.setDataValidation(activeRule);
+}
+
+/**
+ * 2.5 CAT_Suppliers - Proveedores
+ */
+function createCATSuppliersSheet(ss) {
+  const sheet = getOrCreateSheet(ss, 'CAT_Suppliers');
+  
+  // Headers
+  const headers = ['id', 'name', 'brands_json', 'contact', 'phone', 'email', 'active', 'created_at'];
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  
+  // Formato
+  formatHeaders(sheet, headers.length);
+  setColumnWidths(sheet, [150, 200, 250, 200, 120, 200, 80, 150]);
+  
+  // Validación de datos para columna 'active'
+  const activeRange = sheet.getRange(2, 7, 1000);
+  const activeRule = SpreadsheetApp.newDataValidation()
+    .requireCheckbox()
+    .build();
+  activeRange.setDataValidation(activeRule);
+}
+
+/**
+ * 3. CAT_Products - Catálogo de productos (ACTUALIZADO)
+ */
+function createCATProductsSheet(ss) {
+  const sheet = getOrCreateSheet(ss, 'CAT_Products');
+  
+  // Headers actualizados con nuevos campos
+  const headers = [
+    'id', 'barcode', 'name', 'description', 'line_id', 'category_id', 
+    'brand_id', 'supplier_id', 'size', 'color', 'presentation',
+    'purchase_price', 'price', 'min_stock', 'barcode_url', 
+    'active', 'created_at', 'updated_at'
+  ];
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  
+  // Formato
+  formatHeaders(sheet, headers.length);
+  setColumnWidths(sheet, [
+    200, 150, 200, 300, 120, 120, 
+    120, 120, 80, 100, 100,
+    100, 100, 100, 250,
+    80, 150, 150
+  ]);
+  
+  // Formato de moneda para precios
+  const purchasePriceRange = sheet.getRange(2, 12, 1000);
+  purchasePriceRange.setNumberFormat('$#,##0.00');
+  
+  const priceRange = sheet.getRange(2, 13, 1000);
   priceRange.setNumberFormat('$#,##0.00');
   
   // Validación de datos para columna 'active'
-  const activeRange = sheet.getRange(2, 8, 1000);
+  const activeRange = sheet.getRange(2, 16, 1000);
   const activeRule = SpreadsheetApp.newDataValidation()
     .requireCheckbox()
     .build();
@@ -685,6 +829,15 @@ function seedDataWithSpreadsheet(ss) {
   // Poblar cada hoja con datos de ejemplo
   seedCFGUsers(ss);
   seedCFGParams(ss);
+  
+  // Poblar hojas maestras
+  seedCATLines(ss);
+  seedCATCategories(ss);
+  seedCATBrands(ss);
+  seedCATSizes(ss);
+  seedCATSuppliers(ss);
+  
+  // Poblar productos y stock
   seedCATProducts(ss);
   seedINVStock(ss);
   seedCRMClients(ss);
@@ -782,7 +935,8 @@ function seedCFGParams(ss) {
     ['DEFAULT_CREDIT_LIMIT', '2000', 'Límite de crédito por defecto para nuevos clientes', 'NUMBER'],
     ['STORE_NAME_MUJERES', 'Adiction Boutique Mujeres', 'Nombre de la tienda de mujeres', 'STRING'],
     ['STORE_NAME_HOMBRES', 'Adiction Boutique Hombres', 'Nombre de la tienda de hombres', 'STRING'],
-    ['ENABLE_BARCODE_SCANNER', 'true', 'Habilitar escaneo de códigos de barras con cámara', 'BOOLEAN']
+    ['ENABLE_BARCODE_SCANNER', 'true', 'Habilitar escaneo de códigos de barras con cámara', 'BOOLEAN'],
+    ['DEFAULT_PROFIT_MARGIN', '40', 'Margen de ganancia por defecto (%)', 'NUMBER']
   ];
   
   sheet.getRange(2, 1, params.length, params[0].length).setValues(params);
@@ -790,7 +944,233 @@ function seedCFGParams(ss) {
 }
 
 /**
- * Poblar CAT_Products con productos de ejemplo
+ * Poblar CAT_Lines con líneas de productos
+ */
+function seedCATLines(ss) {
+  const sheet = ss.getSheetByName('CAT_Lines');
+  if (!sheet) {
+    Logger.log('ERROR: Hoja CAT_Lines no existe');
+    return;
+  }
+  
+  const now = new Date();
+  const lines = [
+    ['line_001', 'Mujeres', true, now],
+    ['line_002', 'Hombres', true, now],
+    ['line_003', 'Niños', true, now],
+    ['line_004', 'Unisex', true, now]
+  ];
+  
+  sheet.getRange(2, 1, lines.length, lines[0].length).setValues(lines);
+  Logger.log('CAT_Lines: ' + lines.length + ' líneas insertadas');
+}
+
+/**
+ * Poblar CAT_Categories con categorías
+ */
+function seedCATCategories(ss) {
+  const sheet = ss.getSheetByName('CAT_Categories');
+  if (!sheet) {
+    Logger.log('ERROR: Hoja CAT_Categories no existe');
+    return;
+  }
+  
+  const now = new Date();
+  const categories = [
+    // Mujeres
+    ['cat_001', 'Blusas', 'line_001', true, now],
+    ['cat_002', 'Pantalones', 'line_001', true, now],
+    ['cat_003', 'Vestidos', 'line_001', true, now],
+    ['cat_004', 'Faldas', 'line_001', true, now],
+    ['cat_005', 'Zapatos', 'line_001', true, now],
+    ['cat_006', 'Carteras', 'line_001', true, now],
+    
+    // Hombres
+    ['cat_007', 'Camisas', 'line_002', true, now],
+    ['cat_008', 'Pantalones', 'line_002', true, now],
+    ['cat_009', 'Polos', 'line_002', true, now],
+    ['cat_010', 'Zapatos', 'line_002', true, now],
+    ['cat_011', 'Shorts', 'line_002', true, now],
+    
+    // Niños
+    ['cat_012', 'Polos', 'line_003', true, now],
+    ['cat_013', 'Pantalones', 'line_003', true, now],
+    ['cat_014', 'Vestidos', 'line_003', true, now],
+    
+    // Unisex
+    ['cat_015', 'Perfumes', 'line_004', true, now],
+    ['cat_016', 'Accesorios', 'line_004', true, now]
+  ];
+  
+  sheet.getRange(2, 1, categories.length, categories[0].length).setValues(categories);
+  Logger.log('CAT_Categories: ' + categories.length + ' categorías insertadas');
+}
+
+/**
+ * Poblar CAT_Brands con marcas
+ */
+function seedCATBrands(ss) {
+  const sheet = ss.getSheetByName('CAT_Brands');
+  if (!sheet) {
+    Logger.log('ERROR: Hoja CAT_Brands no existe');
+    return;
+  }
+  
+  const now = new Date();
+  const brands = [
+    ['brand_001', 'Adidas', true, now],
+    ['brand_002', 'Nike', true, now],
+    ['brand_003', 'Zara', true, now],
+    ['brand_004', 'H&M', true, now],
+    ['brand_005', 'Forever 21', true, now],
+    ['brand_006', 'Levi\'s', true, now],
+    ['brand_007', 'Tommy Hilfiger', true, now],
+    ['brand_008', 'Calvin Klein', true, now],
+    ['brand_009', 'Puma', true, now],
+    ['brand_010', 'Reebok', true, now],
+    ['brand_011', 'Genérica', true, now]
+  ];
+  
+  sheet.getRange(2, 1, brands.length, brands[0].length).setValues(brands);
+  Logger.log('CAT_Brands: ' + brands.length + ' marcas insertadas');
+}
+
+/**
+ * Poblar CAT_Sizes con tallas por categoría
+ */
+function seedCATSizes(ss) {
+  const sheet = ss.getSheetByName('CAT_Sizes');
+  if (!sheet) {
+    Logger.log('ERROR: Hoja CAT_Sizes no existe');
+    return;
+  }
+  
+  const now = new Date();
+  const sizes = [
+    // Tallas de ropa (XS, S, M, L, XL, XXL)
+    ['size_001', 'cat_001', 'XS', 1, true, now],
+    ['size_002', 'cat_001', 'S', 2, true, now],
+    ['size_003', 'cat_001', 'M', 3, true, now],
+    ['size_004', 'cat_001', 'L', 4, true, now],
+    ['size_005', 'cat_001', 'XL', 5, true, now],
+    ['size_006', 'cat_001', 'XXL', 6, true, now],
+    
+    // Pantalones mujeres (tallas numéricas)
+    ['size_007', 'cat_002', '26', 1, true, now],
+    ['size_008', 'cat_002', '28', 2, true, now],
+    ['size_009', 'cat_002', '30', 3, true, now],
+    ['size_010', 'cat_002', '32', 4, true, now],
+    ['size_011', 'cat_002', '34', 5, true, now],
+    ['size_012', 'cat_002', '36', 6, true, now],
+    
+    // Vestidos (XS-XXL)
+    ['size_013', 'cat_003', 'XS', 1, true, now],
+    ['size_014', 'cat_003', 'S', 2, true, now],
+    ['size_015', 'cat_003', 'M', 3, true, now],
+    ['size_016', 'cat_003', 'L', 4, true, now],
+    ['size_017', 'cat_003', 'XL', 5, true, now],
+    
+    // Zapatos mujeres (35-40)
+    ['size_018', 'cat_005', '35', 1, true, now],
+    ['size_019', 'cat_005', '36', 2, true, now],
+    ['size_020', 'cat_005', '37', 3, true, now],
+    ['size_021', 'cat_005', '38', 4, true, now],
+    ['size_022', 'cat_005', '39', 5, true, now],
+    ['size_023', 'cat_005', '40', 6, true, now],
+    
+    // Camisas hombres (S-XXL)
+    ['size_024', 'cat_007', 'S', 1, true, now],
+    ['size_025', 'cat_007', 'M', 2, true, now],
+    ['size_026', 'cat_007', 'L', 3, true, now],
+    ['size_027', 'cat_007', 'XL', 4, true, now],
+    ['size_028', 'cat_007', 'XXL', 5, true, now],
+    
+    // Pantalones hombres (30-40)
+    ['size_029', 'cat_008', '30', 1, true, now],
+    ['size_030', 'cat_008', '32', 2, true, now],
+    ['size_031', 'cat_008', '34', 3, true, now],
+    ['size_032', 'cat_008', '36', 4, true, now],
+    ['size_033', 'cat_008', '38', 5, true, now],
+    ['size_034', 'cat_008', '40', 6, true, now],
+    
+    // Zapatos hombres (39-44)
+    ['size_035', 'cat_010', '39', 1, true, now],
+    ['size_036', 'cat_010', '40', 2, true, now],
+    ['size_037', 'cat_010', '41', 3, true, now],
+    ['size_038', 'cat_010', '42', 4, true, now],
+    ['size_039', 'cat_010', '43', 5, true, now],
+    ['size_040', 'cat_010', '44', 6, true, now],
+    
+    // Perfumes (presentaciones)
+    ['size_041', 'cat_015', '50ml', 1, true, now],
+    ['size_042', 'cat_015', '100ml', 2, true, now],
+    ['size_043', 'cat_015', '150ml', 3, true, now]
+  ];
+  
+  sheet.getRange(2, 1, sizes.length, sizes[0].length).setValues(sizes);
+  Logger.log('CAT_Sizes: ' + sizes.length + ' tallas insertadas');
+}
+
+/**
+ * Poblar CAT_Suppliers con proveedores
+ */
+function seedCATSuppliers(ss) {
+  const sheet = ss.getSheetByName('CAT_Suppliers');
+  if (!sheet) {
+    Logger.log('ERROR: Hoja CAT_Suppliers no existe');
+    return;
+  }
+  
+  const now = new Date();
+  const suppliers = [
+    [
+      'sup_001',
+      'Distribuidora Deportiva SAC',
+      '["brand_001", "brand_002", "brand_009", "brand_010"]',
+      'Carlos Mendoza',
+      '987123456',
+      'ventas@distdeportiva.com',
+      true,
+      now
+    ],
+    [
+      'sup_002',
+      'Importaciones Fashion Peru',
+      '["brand_003", "brand_004", "brand_005"]',
+      'María González',
+      '987234567',
+      'contacto@fashionperu.com',
+      true,
+      now
+    ],
+    [
+      'sup_003',
+      'Textiles Premium EIRL',
+      '["brand_006", "brand_007", "brand_008"]',
+      'Roberto Silva',
+      '987345678',
+      'ventas@textilespremium.com',
+      true,
+      now
+    ],
+    [
+      'sup_004',
+      'Mayorista Ropa Nacional',
+      '["brand_011"]',
+      'Ana Torres',
+      '987456789',
+      'info@mayoristanacional.com',
+      true,
+      now
+    ]
+  ];
+  
+  sheet.getRange(2, 1, suppliers.length, suppliers[0].length).setValues(suppliers);
+  Logger.log('CAT_Suppliers: ' + suppliers.length + ' proveedores insertados');
+}
+
+/**
+ * Poblar CAT_Products con productos de ejemplo (ACTUALIZADO)
  */
 function seedCATProducts(ss) {
   const sheet = ss.getSheetByName('CAT_Products');
@@ -800,22 +1180,35 @@ function seedCATProducts(ss) {
   }
   
   const now = new Date();
+  // Estructura: id, barcode, name, description, line_id, category_id, brand_id, supplier_id, 
+  //             size, color, presentation, purchase_price, price, min_stock, barcode_url, active, created_at, updated_at
   const products = [
-    ['prd_001', '7501234567890', 'Blusa Floral Manga Corta', 'Blusa elegante con estampado floral, manga corta', 89.90, 'Blusas', 5, true, now, now],
-    ['prd_002', '7501234567891', 'Pantalón Jean Skinny Mujer', 'Pantalón jean ajustado de mezclilla azul', 129.90, 'Pantalones', 8, true, now, now],
-    ['prd_003', '7501234567892', 'Vestido Casual Verano', 'Vestido ligero ideal para verano, varios colores', 149.90, 'Vestidos', 6, true, now, now],
-    ['prd_004', '7501234567893', 'Falda Plisada Midi', 'Falda plisada elegante, largo midi', 99.90, 'Faldas', 7, true, now, now],
-    ['prd_005', '7501234567894', 'Camisa Formal Hombre Blanca', 'Camisa formal de vestir, color blanco', 119.90, 'Camisas', 10, true, now, now],
-    ['prd_006', '7501234567895', 'Pantalón Casual Hombre Beige', 'Pantalón casual de tela, color beige', 139.90, 'Pantalones', 8, true, now, now],
-    ['prd_007', '7501234567896', 'Polo Deportivo Hombre', 'Polo deportivo de algodón, varios colores', 69.90, 'Polos', 15, true, now, now],
-    ['prd_008', '7501234567897', 'Chaqueta Jean Mujer', 'Chaqueta de mezclilla estilo casual', 179.90, 'Chaquetas', 5, true, now, now],
-    ['prd_009', '7501234567898', 'Short Jean Mujer', 'Short de mezclilla, corte moderno', 79.90, 'Shorts', 12, true, now, now],
-    ['prd_010', '7501234567899', 'Suéter Cuello V Hombre', 'Suéter de lana, cuello en V', 159.90, 'Suéteres', 6, true, now, now],
-    ['prd_011', '7501234567900', 'Leggings Deportivos Mujer', 'Leggings elásticos para deporte o casual', 59.90, 'Deportivo', 20, true, now, now],
-    ['prd_012', '7501234567901', 'Camisa Cuadros Hombre', 'Camisa casual a cuadros, manga larga', 99.90, 'Camisas', 9, true, now, now],
-    ['prd_013', '7501234567902', 'Blazer Formal Mujer Negro', 'Blazer elegante para oficina, color negro', 249.90, 'Blazers', 4, true, now, now],
-    ['prd_014', '7501234567903', 'Bermuda Cargo Hombre', 'Bermuda estilo cargo con bolsillos', 89.90, 'Shorts', 10, true, now, now],
-    ['prd_015', '7501234567904', 'Top Crop Mujer', 'Top corto estilo moderno, varios colores', 49.90, 'Tops', 18, true, now, now]
+    // Blusas Mujeres
+    ['prd_001', '7501234567890', 'Blusa Floral Manga Corta', 'Blusa elegante con estampado floral', 'line_001', 'cat_001', 'brand_003', 'sup_002', 'M', 'Floral', 'Unidad', 45.00, 89.90, 5, '', true, now, now],
+    ['prd_002', '7501234567891', 'Blusa Floral Manga Corta', 'Blusa elegante con estampado floral', 'line_001', 'cat_001', 'brand_003', 'sup_002', 'L', 'Floral', 'Unidad', 45.00, 89.90, 5, '', true, now, now],
+    
+    // Pantalones Mujeres
+    ['prd_003', '7501234567892', 'Pantalón Jean Skinny', 'Pantalón jean ajustado de mezclilla azul', 'line_001', 'cat_002', 'brand_006', 'sup_003', '28', 'Azul', 'Unidad', 65.00, 129.90, 8, '', true, now, now],
+    ['prd_004', '7501234567893', 'Pantalón Jean Skinny', 'Pantalón jean ajustado de mezclilla azul', 'line_001', 'cat_002', 'brand_006', 'sup_003', '30', 'Azul', 'Unidad', 65.00, 129.90, 8, '', true, now, now],
+    ['prd_005', '7501234567894', 'Pantalón Jean Skinny', 'Pantalón jean ajustado de mezclilla azul', 'line_001', 'cat_002', 'brand_006', 'sup_003', '32', 'Azul', 'Unidad', 65.00, 129.90, 8, '', true, now, now],
+    
+    // Vestidos
+    ['prd_006', '7501234567895', 'Vestido Casual Verano', 'Vestido ligero ideal para verano', 'line_001', 'cat_003', 'brand_004', 'sup_002', 'S', 'Rojo', 'Unidad', 75.00, 149.90, 6, '', true, now, now],
+    ['prd_007', '7501234567896', 'Vestido Casual Verano', 'Vestido ligero ideal para verano', 'line_001', 'cat_003', 'brand_004', 'sup_002', 'M', 'Rojo', 'Unidad', 75.00, 149.90, 6, '', true, now, now],
+    
+    // Camisas Hombres
+    ['prd_008', '7501234567897', 'Camisa Formal Blanca', 'Camisa formal de vestir', 'line_002', 'cat_007', 'brand_007', 'sup_003', 'M', 'Blanco', 'Unidad', 60.00, 119.90, 10, '', true, now, now],
+    ['prd_009', '7501234567898', 'Camisa Formal Blanca', 'Camisa formal de vestir', 'line_002', 'cat_007', 'brand_007', 'sup_003', 'L', 'Blanco', 'Unidad', 60.00, 119.90, 10, '', true, now, now],
+    ['prd_010', '7501234567899', 'Camisa Cuadros', 'Camisa casual a cuadros', 'line_002', 'cat_007', 'brand_007', 'sup_003', 'M', 'Azul', 'Unidad', 50.00, 99.90, 9, '', true, now, now],
+    
+    // Pantalones Hombres
+    ['prd_011', '7501234567900', 'Pantalón Casual Beige', 'Pantalón casual de tela', 'line_002', 'cat_008', 'brand_006', 'sup_003', '32', 'Beige', 'Unidad', 70.00, 139.90, 8, '', true, now, now],
+    ['prd_012', '7501234567901', 'Pantalón Casual Beige', 'Pantalón casual de tela', 'line_002', 'cat_008', 'brand_006', 'sup_003', '34', 'Beige', 'Unidad', 70.00, 139.90, 8, '', true, now, now],
+    
+    // Polos Deportivos
+    ['prd_013', '7501234567902', 'Polo Deportivo', 'Polo deportivo de algodón', 'line_002', 'cat_009', 'brand_001', 'sup_001', 'M', 'Negro', 'Unidad', 35.00, 69.90, 15, '', true, now, now],
+    ['prd_014', '7501234567903', 'Polo Deportivo', 'Polo deportivo de algodón', 'line_002', 'cat_009', 'brand_001', 'sup_001', 'L', 'Negro', 'Unidad', 35.00, 69.90, 15, '', true, now, now],
+    ['prd_015', '7501234567904', 'Polo Deportivo', 'Polo deportivo de algodón', 'line_002', 'cat_009', 'brand_002', 'sup_001', 'M', 'Azul', 'Unidad', 35.00, 69.90, 15, '', true, now, now]
   ];
   
   sheet.getRange(2, 1, products.length, products[0].length).setValues(products);

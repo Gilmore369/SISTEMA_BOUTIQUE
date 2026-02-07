@@ -130,7 +130,6 @@
               <thead>
                 <tr>
                   <th>Cliente</th>
-                  <th>DNI</th>
                   <th>Plan</th>
                   <th>Cuota</th>
                   <th>Monto</th>
@@ -160,7 +159,6 @@
               <thead>
                 <tr>
                   <th>Cliente</th>
-                  <th>DNI</th>
                   <th>Plan</th>
                   <th>Cuota</th>
                   <th>Monto</th>
@@ -189,7 +187,6 @@
               <thead>
                 <tr>
                   <th>Cliente</th>
-                  <th>DNI</th>
                   <th>Plan</th>
                   <th>Cuota</th>
                   <th>Monto</th>
@@ -227,7 +224,7 @@
           <!-- Client Info -->
           <div class="alert alert-info">
             <strong>Cliente:</strong> <span id="modalClientName"></span><br>
-            <strong>DNI:</strong> <span id="modalClientDNI"></span>
+            <strong>Plan:</strong> <span id="modalPlanId"></span>
           </div>
           
           <!-- Payment Form -->
@@ -373,10 +370,9 @@
         { 
           data: 'client_name',
           render: function(data, type, row) {
-            return '<a href="?page=cliente-detalle&id=' + row.client_id + '">' + data + '</a>';
+            return '<a href="?page=cliente-detalle&id=' + row.client_id + '">' + (data || 'Cliente') + '</a>';
           }
         },
-        { data: 'client_dni' },
         { data: 'plan_id' },
         { data: 'installment_number' },
         { 
@@ -626,8 +622,8 @@
       currentPaymentData = installmentData;
       
       // Populate modal
-      $('#modalClientName').text(installmentData.client_name);
-      $('#modalClientDNI').text(installmentData.client_dni);
+      $('#modalClientName').text(installmentData.client_name || 'Cliente');
+      $('#modalPlanId').text(installmentData.plan_id || '');
       $('#modalInstallmentId').val(installmentData.id);
       $('#modalClientId').val(installmentData.client_id);
       

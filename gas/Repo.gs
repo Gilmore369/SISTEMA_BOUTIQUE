@@ -2731,3 +2731,287 @@ function testExpenseRepository() {
     Logger.log('Stack trace: ' + error.stack);
   }
 }
+
+
+// ============================================================================
+// REPOSITORIOS PARA HOJAS MAESTRAS DE CATÁLOGO
+// ============================================================================
+
+/**
+ * LineRepository - Repositorio para CAT_Lines
+ * 
+ * Gestiona el acceso a la hoja de líneas de productos (Hombres, Mujeres, Niños).
+ * Hereda todas las operaciones CRUD de BaseRepository.
+ * 
+ * @class
+ * @extends BaseRepository
+ */
+class LineRepository extends BaseRepository {
+  /**
+   * Constructor
+   */
+  constructor() {
+    super(SHEETS.CAT_LINES);
+  }
+  
+  /**
+   * findActive - Obtiene todas las líneas activas
+   * 
+   * @returns {Array<Object>} Array de líneas activas
+   * @throws {Error} Si hay error al buscar
+   */
+  findActive() {
+    try {
+      const lines = this.findAll();
+      return lines.filter(function(line) {
+        return line.active === true || line.active === 'true';
+      });
+    } catch (error) {
+      Logger.log('Error en findActive de LineRepository: ' + error.message);
+      throw error;
+    }
+  }
+}
+
+/**
+ * CategoryRepository - Repositorio para CAT_Categories
+ * 
+ * Gestiona el acceso a la hoja de categorías de productos.
+ * Hereda todas las operaciones CRUD de BaseRepository.
+ * 
+ * @class
+ * @extends BaseRepository
+ */
+class CategoryRepository extends BaseRepository {
+  /**
+   * Constructor
+   */
+  constructor() {
+    super(SHEETS.CAT_CATEGORIES);
+  }
+  
+  /**
+   * findByLine - Busca categorías por línea
+   * 
+   * @param {string} lineId - ID de la línea
+   * @returns {Array<Object>} Array de categorías de la línea
+   * @throws {Error} Si hay error al buscar
+   */
+  findByLine(lineId) {
+    try {
+      if (!lineId) {
+        return [];
+      }
+      
+      const categories = this.findAll();
+      return categories.filter(function(cat) {
+        return cat.line_id === lineId && (cat.active === true || cat.active === 'true');
+      });
+    } catch (error) {
+      Logger.log('Error en findByLine de CategoryRepository: ' + error.message);
+      throw error;
+    }
+  }
+  
+  /**
+   * findActive - Obtiene todas las categorías activas
+   * 
+   * @returns {Array<Object>} Array de categorías activas
+   * @throws {Error} Si hay error al buscar
+   */
+  findActive() {
+    try {
+      const categories = this.findAll();
+      return categories.filter(function(cat) {
+        return cat.active === true || cat.active === 'true';
+      });
+    } catch (error) {
+      Logger.log('Error en findActive de CategoryRepository: ' + error.message);
+      throw error;
+    }
+  }
+}
+
+/**
+ * BrandRepository - Repositorio para CAT_Brands
+ * 
+ * Gestiona el acceso a la hoja de marcas.
+ * Hereda todas las operaciones CRUD de BaseRepository.
+ * 
+ * @class
+ * @extends BaseRepository
+ */
+class BrandRepository extends BaseRepository {
+  /**
+   * Constructor
+   */
+  constructor() {
+    super(SHEETS.CAT_BRANDS);
+  }
+  
+  /**
+   * findActive - Obtiene todas las marcas activas
+   * 
+   * @returns {Array<Object>} Array de marcas activas
+   * @throws {Error} Si hay error al buscar
+   */
+  findActive() {
+    try {
+      const brands = this.findAll();
+      return brands.filter(function(brand) {
+        return brand.active === true || brand.active === 'true';
+      });
+    } catch (error) {
+      Logger.log('Error en findActive de BrandRepository: ' + error.message);
+      throw error;
+    }
+  }
+}
+
+/**
+ * SizeRepository - Repositorio para CAT_Sizes
+ * 
+ * Gestiona el acceso a la hoja de tallas por categoría.
+ * Hereda todas las operaciones CRUD de BaseRepository.
+ * 
+ * @class
+ * @extends BaseRepository
+ */
+class SizeRepository extends BaseRepository {
+  /**
+   * Constructor
+   */
+  constructor() {
+    super(SHEETS.CAT_SIZES);
+  }
+  
+  /**
+   * findByCategory - Busca tallas por categoría
+   * 
+   * @param {string} categoryId - ID de la categoría
+   * @returns {Array<Object>} Array de tallas de la categoría ordenadas por sort_order
+   * @throws {Error} Si hay error al buscar
+   */
+  findByCategory(categoryId) {
+    try {
+      if (!categoryId) {
+        return [];
+      }
+      
+      const sizes = this.findAll();
+      const filtered = sizes.filter(function(size) {
+        return size.category_id === categoryId && (size.active === true || size.active === 'true');
+      });
+      
+      // Ordenar por sort_order
+      filtered.sort(function(a, b) {
+        const orderA = parseInt(a.sort_order) || 0;
+        const orderB = parseInt(b.sort_order) || 0;
+        return orderA - orderB;
+      });
+      
+      return filtered;
+    } catch (error) {
+      Logger.log('Error en findByCategory de SizeRepository: ' + error.message);
+      throw error;
+    }
+  }
+}
+
+/**
+ * SupplierRepository - Repositorio para CAT_Suppliers
+ * 
+ * Gestiona el acceso a la hoja de proveedores.
+ * Hereda todas las operaciones CRUD de BaseRepository.
+ * 
+ * @class
+ * @extends BaseRepository
+ */
+class SupplierRepository extends BaseRepository {
+  /**
+   * Constructor
+   */
+  constructor() {
+    super(SHEETS.CAT_SUPPLIERS);
+  }
+  
+  /**
+   * findActive - Obtiene todos los proveedores activos
+   * 
+   * @returns {Array<Object>} Array de proveedores activos
+   * @throws {Error} Si hay error al buscar
+   */
+  findActive() {
+    try {
+      const suppliers = this.findAll();
+      return suppliers.filter(function(supplier) {
+        return supplier.active === true || supplier.active === 'true';
+      });
+    } catch (error) {
+      Logger.log('Error en findActive de SupplierRepository: ' + error.message);
+      throw error;
+    }
+  }
+  
+  /**
+   * findByBrand - Busca proveedores que manejan una marca específica
+   * 
+   * @param {string} brandId - ID de la marca
+   * @returns {Array<Object>} Array de proveedores que manejan la marca
+   * @throws {Error} Si hay error al buscar
+   */
+  findByBrand(brandId) {
+    try {
+      if (!brandId) {
+        return [];
+      }
+      
+      const suppliers = this.findActive();
+      return suppliers.filter(function(supplier) {
+        if (!supplier.brands_json) {
+          return false;
+        }
+        
+        try {
+          const brands = JSON.parse(supplier.brands_json);
+          return Array.isArray(brands) && brands.indexOf(brandId) !== -1;
+        } catch (e) {
+          Logger.log('Error al parsear brands_json del proveedor ' + supplier.id + ': ' + e.message);
+          return false;
+        }
+      });
+    } catch (error) {
+      Logger.log('Error en findByBrand de SupplierRepository: ' + error.message);
+      throw error;
+    }
+  }
+  
+  /**
+   * findByFilters - Busca proveedores por filtros (línea, categoría, marca)
+   * 
+   * Esta función filtra proveedores según las marcas que manejan.
+   * Útil para mostrar solo proveedores relevantes al seleccionar marca/categoría.
+   * 
+   * @param {Object} filters - Filtros de búsqueda
+   * @param {string} filters.lineId - ID de la línea (opcional)
+   * @param {string} filters.categoryId - ID de la categoría (opcional)
+   * @param {string} filters.brandId - ID de la marca (opcional)
+   * @returns {Array<Object>} Array de proveedores que coinciden con los filtros
+   * @throws {Error} Si hay error al buscar
+   */
+  findByFilters(filters) {
+    try {
+      if (!filters || !filters.brandId) {
+        // Si no hay filtro de marca, retornar todos los proveedores activos
+        return this.findActive();
+      }
+      
+      // Filtrar por marca
+      return this.findByBrand(filters.brandId);
+      
+    } catch (error) {
+      Logger.log('Error en findByFilters de SupplierRepository: ' + error.message);
+      throw error;
+    }
+  }
+}

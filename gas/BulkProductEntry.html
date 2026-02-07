@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ingreso Masivo de Mercadería</title>
+  
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+  
+  <style>
+    body {
+      background-color: #f8f9fa;
+      padding: 20px;
+    }
+    
+    .card {
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    
+    .card-header {
+      background-color: #0d6efd;
+      color: white;
+      font-weight: bold;
+    }
+    
+    .size-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    
+    .size-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    .size-item label {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    
+    .size-item input {
+      width: 80px;
+      text-align: center;
+    }
+    
+    .summary-box {
+      background-color: #e7f3ff;
+      border: 2px solid #0d6efd;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 20px;
+    }
+    
+    .summary-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      font-size: 1.1em;
+    }
+    
+    .summary-item.total {
+      font-weight: bold;
+      font-size: 1.3em;
+      border-top: 2px solid #0d6efd;
+      padding-top: 10px;
+      margin-top: 10px;
+    }
+    
+    .btn-submit {
+      font-size: 1.2em;
+      padding: 12px 30px;
+    }
+    
+    .loading-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.7);
+      z-index: 9999;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .loading-content {
+      background-color: white;
+      padding: 30px;
+      border-radius: 10px;
+      text-align: center;
+    }
+    
+    .spinner-border {
+      width: 3rem;
+      height: 3rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-content">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Cargando...</span>
+      </div>
+      <p class="mt-3 mb-0">Procesando ingreso de mercadería...</p>
+    </div>
+  </div>
+
+  <div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2><i class="bi bi-box-seam"></i> Ingreso Masivo de Mercadería</h2>
+      <button class="btn btn-secondary" onclick="goBack()">
+        <i class="bi bi-arrow-left"></i> Volver
+      </button>
+    </div>
+
+    <form id="bulkEntryForm">
+      <!-- Sección 1: Datos Básicos del Producto -->
+      <div class="card">
+        <div class="card-header">
+          <i class="bi bi-info-circle"></i> Datos Básicos del Producto
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="productName" class="form-label">Nombre del Producto *</label>
+              <input type="text" class="form-control" id="productName" required>
+            </div>
+            
+            <div class="col-md-6 mb-3">
+              <label for="description" class="form-label">Descripción</label>
+              <input type="text" class="form-control" id="description">
+            </div>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-3 mb-3">
+              <label for="lineId" class="form-label">Línea *</label>
+              <select class="form-select" id="lineId" required>
+                <option value="">Seleccione...</option>
+              </select>
+            </div>
+            
+            <div class="col-md-3 mb-3">
+              <label for="categoryId" class="form-label">Categoría *</label>
+              <select class="form-select" id="categoryId" required disabled>
+                <option value="">Seleccione línea primero...</option>
+              </select>
+            </div>
+            
+            <div class="col-md-3 mb-3">
+              <label for="brandId" class="form-label">Marca *</label>
+              <select class="form-select" id="brandId" required>
+                <option value="">Seleccione...</option>
+              </select>
+            </div>
+            
+            <div class="col-md-3 mb-3">
+              <label for="supplierId" class="form-label">Proveedor *</label>
+              <select class="form-select" id="supplierId" required disabled>
+                <option value="">Seleccione marca primero...</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label for="color" class="form-label">Color *</label>
+              <input type="text" class="form-control" id="color" required>
+            </div>
+            
+            <div class="col-md-4 mb-3">
+              <label for="presentation" class="form-label">Presentación</label>
+              <input type="text" class="form-control" id="presentation" placeholder="Ej: Caja, Bolsa, Unidad">
+            </div>
+            
+            <div class="col-md-4 mb-3">
+              <label for="warehouseId" class="form-label">Almacén *</label>
+              <select class="form-select" id="warehouseId" required>
+                <option value="wh-001">Almacén Principal</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sección 2: Precios -->
+      <div class="card">
+        <div class="card-header">
+          <i class="bi bi-currency-dollar"></i> Precios
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label for="purchasePrice" class="form-label">Precio de Compra (S/) *</label>
+              <input type="number" class="form-control" id="purchasePrice" step="0.01" min="0" required>
+            </div>
+            
+            <div class="col-md-4 mb-3">
+              <label for="marginPercent" class="form-label">Margen de Ganancia (%) *</label>
+              <input type="number" class="form-control" id="marginPercent" value="50" step="1" min="0" required>
+            </div>
+            
+            <div class="col-md-4 mb-3">
+              <label for="salePrice" class="form-label">Precio de Venta Sugerido (S/)</label>
+              <input type="number" class="form-control" id="salePrice" step="0.01" min="0" readonly>
+            </div>
+          </div>
+          
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> El precio de venta se calcula automáticamente según el margen de ganancia. Puede ajustarlo manualmente si lo desea.
+          </div>
+        </div>
+      </div>
+
+      <!-- Sección 3: Distribución de Tallas -->
+      <div class="card">
+        <div class="card-header">
+          <i class="bi bi-rulers"></i> Distribución de Tallas
+        </div>
+        <div class="card-body">
+          <div id="sizeDistribution">
+            <p class="text-muted">Seleccione una categoría para ver las tallas disponibles.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sección 4: Resumen -->
+      <div class="card">
+        <div class="card-header">
+          <i class="bi bi-clipboard-check"></i> Resumen del Ingreso
+        </div>
+        <div class="card-body">
+          <div class="summary-box">
+            <div class="summary-item">
+              <span>Total de Unidades:</span>
+              <span id="totalUnits" class="badge bg-primary fs-5">0</span>
+            </div>
+            <div class="summary-item">
+              <span>Inversión Total:</span>
+              <span id="totalInvestment" class="text-primary">S/ 0.00</span>
+            </div>
+            <div class="summary-item">
+              <span>Venta Potencial:</span>
+              <span id="totalPotential" class="text-success">S/ 0.00</span>
+            </div>
+            <div class="summary-item total">
+              <span>Ganancia Estimada:</span>
+              <span id="totalProfit" class="text-success">S/ 0.00</span>
+            </div>
+          </div>
+          
+          <div class="d-grid gap-2 mt-4">
+            <button type="submit" class="btn btn-primary btn-submit">
+              <i class="bi bi-check-circle"></i> Registrar Ingreso de Mercadería
+            </button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Bootstrap 5 JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <script>
+    // Estado global
+    let lines = [];
+    let categories = [];
+    let brands = [];
+    let sizes = [];
+    let suppliers = [];
+    
+    // Log de depuración
+    console.log('=== BulkProductEntry.html cargado ===');
+    console.log('google.script.run disponible:', typeof google !== 'undefined' && typeof google.script !== 'undefined');
+    
+    // Inicializar al cargar la página
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('DOMContentLoaded disparado');
+      
+      // Verificar que google.script.run esté disponible
+      if (typeof google === 'undefined' || typeof google.script === 'undefined') {
+        console.error('ERROR: google.script.run no está disponible');
+        showError('Error de inicialización: google.script.run no disponible');
+        return;
+      }
+      
+      console.log('Iniciando carga de datos maestros...');
+      loadMasterData();
+      setupEventListeners();
+    });
+    
+    // Cargar datos maestros
+    function loadMasterData() {
+      console.log('loadMasterData() iniciado');
+      showLoading();
+      
+      Promise.all([
+        callServer('getMasterData', { type: 'lines' }),
+        callServer('getMasterData', { type: 'brands' })
+      ])
+      .then(results => {
+        console.log('Datos maestros recibidos:', results);
+        lines = results[0];
+        brands = results[1];
+        
+        console.log('Líneas:', lines.length);
+        console.log('Marcas:', brands.length);
+        
+        populateLines();
+        populateBrands();
+        
+        hideLoading();
+      })
+      .catch(error => {
+        console.error('Error al cargar datos maestros:', error);
+        hideLoading();
+        showError('Error al cargar datos maestros: ' + error.message);
+      });
+    }
+    
+    // Poblar select de líneas
+    function populateLines() {
+      console.log('populateLines() iniciado con', lines.length, 'líneas');
+      const select = document.getElementById('lineId');
+      select.innerHTML = '<option value="">Seleccione...</option>';
+      
+      lines.forEach(line => {
+        const option = document.createElement('option');
+        option.value = line.id;
+        option.textContent = line.name;
+        select.appendChild(option);
+      });
+      
+      console.log('Select de líneas poblado con', select.options.length - 1, 'opciones');
+    }
+    
+    // Poblar select de marcas
+    function populateBrands() {
+      console.log('populateBrands() iniciado con', brands.length, 'marcas');
+      const select = document.getElementById('brandId');
+      select.innerHTML = '<option value="">Seleccione...</option>';
+      
+      brands.forEach(brand => {
+        const option = document.createElement('option');
+        option.value = brand.id;
+        option.textContent = brand.name;
+        select.appendChild(option);
+      });
+      
+      console.log('Select de marcas poblado con', select.options.length - 1, 'opciones');
+    }
+    
+    // Configurar event listeners
+    function setupEventListeners() {
+      // Cambio de línea -> cargar categorías
+      document.getElementById('lineId').addEventListener('change', function() {
+        const lineId = this.value;
+        if (lineId) {
+          loadCategories(lineId);
+        } else {
+          document.getElementById('categoryId').disabled = true;
+          document.getElementById('categoryId').innerHTML = '<option value="">Seleccione línea primero...</option>';
+        }
+      });
+      
+      // Cambio de categoría -> cargar tallas
+      document.getElementById('categoryId').addEventListener('change', function() {
+        const categoryId = this.value;
+        if (categoryId) {
+          loadSizes(categoryId);
+        } else {
+          document.getElementById('sizeDistribution').innerHTML = '<p class="text-muted">Seleccione una categoría para ver las tallas disponibles.</p>';
+        }
+      });
+      
+      // Cambio de marca -> filtrar proveedores
+      document.getElementById('brandId').addEventListener('change', function() {
+        const brandId = this.value;
+        if (brandId) {
+          loadSuppliers(brandId);
+        } else {
+          document.getElementById('supplierId').disabled = true;
+          document.getElementById('supplierId').innerHTML = '<option value="">Seleccione marca primero...</option>';
+        }
+      });
+      
+      // Calcular precio de venta al cambiar precio de compra o margen
+      document.getElementById('purchasePrice').addEventListener('input', calculateSalePrice);
+      document.getElementById('marginPercent').addEventListener('input', calculateSalePrice);
+      
+      // Permitir edición manual del precio de venta
+      document.getElementById('salePrice').addEventListener('focus', function() {
+        this.readOnly = false;
+      });
+      
+      // Submit del formulario
+      document.getElementById('bulkEntryForm').addEventListener('submit', handleSubmit);
+    }
+    
+    // Cargar categorías por línea
+    function loadCategories(lineId) {
+      showLoading();
+      
+      callServer('getMasterData', { type: 'categories', lineId: lineId })
+        .then(data => {
+          categories = data;
+          
+          const select = document.getElementById('categoryId');
+          select.innerHTML = '<option value="">Seleccione...</option>';
+          select.disabled = false;
+          
+          categories.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat.id;
+            option.textContent = cat.name;
+            select.appendChild(option);
+          });
+          
+          hideLoading();
+        })
+        .catch(error => {
+          hideLoading();
+          showError('Error al cargar categorías: ' + error.message);
+        });
+    }
+    
+    // Cargar tallas por categoría
+    function loadSizes(categoryId) {
+      showLoading();
+      
+      callServer('getMasterData', { type: 'sizes', categoryId: categoryId })
+        .then(data => {
+          sizes = data;
+          renderSizeGrid();
+          hideLoading();
+        })
+        .catch(error => {
+          hideLoading();
+          showError('Error al cargar tallas: ' + error.message);
+        });
+    }
+    
+    // Cargar proveedores por marca
+    function loadSuppliers(brandId) {
+      showLoading();
+      
+      callServer('getMasterData', { type: 'suppliers', brandId: brandId })
+        .then(data => {
+          suppliers = data;
+          
+          const select = document.getElementById('supplierId');
+          select.innerHTML = '<option value="">Seleccione...</option>';
+          select.disabled = false;
+          
+          suppliers.forEach(supplier => {
+            const option = document.createElement('option');
+            option.value = supplier.id;
+            option.textContent = supplier.name;
+            select.appendChild(option);
+          });
+          
+          hideLoading();
+        })
+        .catch(error => {
+          hideLoading();
+          showError('Error al cargar proveedores: ' + error.message);
+        });
+    }
+    
+    // Renderizar grid de tallas
+    function renderSizeGrid() {
+      const container = document.getElementById('sizeDistribution');
+      
+      if (sizes.length === 0) {
+        container.innerHTML = '<p class="text-muted">No hay tallas disponibles para esta categoría.</p>';
+        return;
+      }
+      
+      let html = '<div class="size-grid">';
+      
+      sizes.forEach(size => {
+        html += `
+          <div class="size-item">
+            <label>${size.value}</label>
+            <input type="number" 
+                   class="form-control size-quantity" 
+                   data-size-id="${size.id}" 
+                   data-size-value="${size.value}" 
+                   min="0" 
+                   value="0"
+                   onchange="updateSummary()">
+          </div>
+        `;
+      });
+      
+      html += '</div>';
+      container.innerHTML = html;
+    }
+    
+    // Calcular precio de venta
+    function calculateSalePrice() {
+      const purchasePrice = parseFloat(document.getElementById('purchasePrice').value) || 0;
+      const marginPercent = parseFloat(document.getElementById('marginPercent').value) || 0;
+      
+      const salePrice = purchasePrice * (1 + marginPercent / 100);
+      document.getElementById('salePrice').value = salePrice.toFixed(2);
+      
+      updateSummary();
+    }
+    
+    // Actualizar resumen
+    function updateSummary() {
+      const purchasePrice = parseFloat(document.getElementById('purchasePrice').value) || 0;
+      const salePrice = parseFloat(document.getElementById('salePrice').value) || 0;
+      
+      // Calcular total de unidades
+      let totalUnits = 0;
+      document.querySelectorAll('.size-quantity').forEach(input => {
+        totalUnits += parseInt(input.value) || 0;
+      });
+      
+      // Calcular totales
+      const totalInvestment = totalUnits * purchasePrice;
+      const totalPotential = totalUnits * salePrice;
+      const totalProfit = totalPotential - totalInvestment;
+      
+      // Actualizar UI
+      document.getElementById('totalUnits').textContent = totalUnits;
+      document.getElementById('totalInvestment').textContent = 'S/ ' + totalInvestment.toFixed(2);
+      document.getElementById('totalPotential').textContent = 'S/ ' + totalPotential.toFixed(2);
+      document.getElementById('totalProfit').textContent = 'S/ ' + totalProfit.toFixed(2);
+    }
+    
+    // Manejar submit del formulario
+    function handleSubmit(e) {
+      e.preventDefault();
+      
+      // Validar que haya al menos una talla con cantidad
+      const sizeInputs = document.querySelectorAll('.size-quantity');
+      let hasQuantity = false;
+      
+      sizeInputs.forEach(input => {
+        if (parseInt(input.value) > 0) {
+          hasQuantity = true;
+        }
+      });
+      
+      if (!hasQuantity) {
+        showError('Debe ingresar al menos una cantidad en las tallas.');
+        return;
+      }
+      
+      // Recopilar datos del formulario
+      const formData = {
+        productName: document.getElementById('productName').value,
+        description: document.getElementById('description').value,
+        lineId: document.getElementById('lineId').value,
+        categoryId: document.getElementById('categoryId').value,
+        brandId: document.getElementById('brandId').value,
+        supplierId: document.getElementById('supplierId').value,
+        color: document.getElementById('color').value,
+        presentation: document.getElementById('presentation').value,
+        warehouseId: document.getElementById('warehouseId').value,
+        purchasePrice: parseFloat(document.getElementById('purchasePrice').value),
+        salePrice: parseFloat(document.getElementById('salePrice').value),
+        sizes: []
+      };
+      
+      // Recopilar tallas con cantidades
+      sizeInputs.forEach(input => {
+        const quantity = parseInt(input.value) || 0;
+        if (quantity > 0) {
+          formData.sizes.push({
+            sizeId: input.dataset.sizeId,
+            sizeValue: input.dataset.sizeValue,
+            quantity: quantity
+          });
+        }
+      });
+      
+      // Confirmar antes de enviar
+      if (!confirm(`¿Confirma el ingreso de ${formData.sizes.reduce((sum, s) => sum + s.quantity, 0)} unidades?`)) {
+        return;
+      }
+      
+      // Enviar al servidor
+      showLoading();
+      
+      callServer('createBulkProducts', formData)
+        .then(result => {
+          hideLoading();
+          showSuccess(`Ingreso exitoso: ${result.productsCreated} productos creados, ${result.totalUnits} unidades registradas.`);
+          
+          // Limpiar formulario después de 2 segundos
+          setTimeout(() => {
+            document.getElementById('bulkEntryForm').reset();
+            document.getElementById('sizeDistribution').innerHTML = '<p class="text-muted">Seleccione una categoría para ver las tallas disponibles.</p>';
+            updateSummary();
+          }, 2000);
+        })
+        .catch(error => {
+          hideLoading();
+          showError('Error al registrar ingreso: ' + error.message);
+        });
+    }
+    
+    // Utilidades
+    function callServer(action, payload) {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(response => {
+            if (response.success) {
+              resolve(response.data);
+            } else {
+              reject(new Error(response.error?.message || 'Error desconocido'));
+            }
+          })
+          .withFailureHandler(error => {
+            reject(new Error(error.message || 'Error de comunicación con el servidor'));
+          })
+          .handleBulkProductAction(action, payload);
+      });
+    }
+    
+    function showLoading() {
+      document.getElementById('loadingOverlay').style.display = 'flex';
+    }
+    
+    function hideLoading() {
+      document.getElementById('loadingOverlay').style.display = 'none';
+    }
+    
+    function showError(message) {
+      alert('ERROR: ' + message);
+    }
+    
+    function showSuccess(message) {
+      alert('ÉXITO: ' + message);
+    }
+    
+    function goBack() {
+      window.top.location.href = '<?= getScriptUrl() ?>?page=products';
+    }
+  </script>
+</body>
+</html>

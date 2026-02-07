@@ -145,6 +145,24 @@
               </a>
             </li>
             <li class="nav-item">
+              <a class="nav-link" href="#" onclick="navigateTo('products'); return false;">
+                <i class="bi bi-tags"></i>
+                Productos
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" onclick="navigateTo('bulk-entry'); return false;">
+                <i class="bi bi-box-seam-fill"></i>
+                Ingreso Masivo
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" onclick="navigateTo('suppliers'); return false;">
+                <i class="bi bi-truck"></i>
+                Proveedores
+              </a>
+            </li>
+            <li class="nav-item">
               <a class="nav-link" href="#" onclick="navigateTo('clients'); return false;">
                 <i class="bi bi-people"></i>
                 Clientes
@@ -189,6 +207,8 @@
               <? } else if (currentPage === 'pos') { ?>Punto de Venta
               <? } else if (currentPage === 'barcode-scanner') { ?>Escanear Código de Barras
               <? } else if (currentPage === 'inventory') { ?>Inventario
+              <? } else if (currentPage === 'products') { ?>Productos
+              <? } else if (currentPage === 'bulk-entry') { ?>Ingreso Masivo de Mercadería
               <? } else if (currentPage === 'clients') { ?>Clientes
               <? } else if (currentPage === 'collections') { ?>Cobranzas
               <? } else if (currentPage === 'cash') { ?>Caja
@@ -236,7 +256,7 @@
                     <div class="card-body">
                       <h5 class="card-title"><i class="bi bi-exclamation-triangle"></i> Stock Bajo</h5>
                       <p class="card-text display-6" id="lowStockCount">0</p>
-                      <small class="text-white-50">Click para ver detalle</small>
+                      <small class="text-white-50" id="lowStockDetails">productos</small>
                     </div>
                   </div>
                 </div>
@@ -285,8 +305,16 @@
               <?!= include('BarcodeScanner'); ?>
             <? } else if (currentPage === 'inventory') { ?>
               <?!= include('InventoryReport'); ?>
+            <? } else if (currentPage === 'products') { ?>
+              <?!= include('ProductList'); ?>
+            <? } else if (currentPage === 'bulk-entry') { ?>
+              <?!= include('BulkProductEntry'); ?>
             <? } else if (currentPage === 'clients') { ?>
               <?!= include('ClientList'); ?>
+            <? } else if (currentPage === 'cliente-form') { ?>
+              <?!= include('ClientForm'); ?>
+            <? } else if (currentPage === 'producto-form') { ?>
+              <?!= include('ProductForm'); ?>
             <? } else if (currentPage === 'collections') { ?>
               <?!= include('Collections'); ?>
             <? } else if (currentPage === 'cash') { ?>
@@ -296,10 +324,7 @@
             <? } else if (currentPage === 'invoices') { ?>
               <?!= include('InvoiceList'); ?>
             <? } else if (currentPage === 'settings') { ?>
-              <div class="alert alert-info">
-                <h4><i class="bi bi-gear"></i> Configuración</h4>
-                <p>Módulo de configuración en desarrollo.</p>
-              </div>
+              <?!= include('Settings'); ?>
             <? } else { ?>
               <div class="alert alert-warning">
                 <h4><i class="bi bi-exclamation-triangle"></i> Página no encontrada</h4>
@@ -442,6 +467,14 @@
             }
             if (data.lowStockCount !== undefined) {
               $('#lowStockCount').text(data.lowStockCount);
+              // Mostrar detalles adicionales si hay datos
+              if (data.lowStockCount > 0 && data.lowStockTotalUnits !== undefined) {
+                $('#lowStockDetails').text(data.lowStockTotalUnits + ' unidades faltantes');
+              } else if (data.lowStockCount === 0) {
+                $('#lowStockDetails').text('Todo OK');
+              } else {
+                $('#lowStockDetails').text('productos');
+              }
             }
             if (data.overdueCount !== undefined) {
               $('#overdueCount').text(data.overdueCount);

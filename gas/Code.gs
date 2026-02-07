@@ -349,8 +349,19 @@ function routeGet(e, userEmail) {
     case 'inventory':
       return renderInventory(userData, params);
       
+    case 'products':
+    case 'productos':
+      return renderProducts(userData, params);
+      
+    case 'bulk-entry':
+    case 'ingreso-masivo':
+      return renderBulkProductEntry(userData, params);
+      
     case 'clients':
       return renderClients(userData, params);
+      
+    case 'cliente-form':
+      return renderClientForm(userData, params);
       
     case 'collections':
       return renderCollections(userData, params);
@@ -363,6 +374,9 @@ function routeGet(e, userEmail) {
       
     case 'invoices':
       return renderInvoices(userData, params);
+      
+    case 'producto-form':
+      return renderProductForm(userData, params);
       
     case 'settings':
       return renderSettings(userData, params);
@@ -407,6 +421,13 @@ function routePost(requestData, userEmail) {
     else if (action === 'getDashboardData') {
       // getDashboardData ya retorna createSuccessResponse, retornar directamente
       return getDashboardData();
+    }
+    // System Settings
+    else if (action === 'getSystemSettings') {
+      return getSystemSettings();
+    }
+    else if (action === 'updateSystemSettings') {
+      return updateSystemSettings(payload, userEmail);
     }
     // Productos (incluyendo acciones sin prefijo para compatibilidad con DataTables)
     else if (action.startsWith('product/') || action === 'getProducts' || action === 'getProduct' || 
@@ -1155,6 +1176,20 @@ function renderClients(userData, params) {
 }
 
 /**
+ * renderProducts - Renderiza la página de productos
+ */
+function renderProducts(userData, params) {
+  return renderBasePage(userData, 'products');
+}
+
+/**
+ * renderClientForm - Renderiza el formulario de cliente
+ */
+function renderClientForm(userData, params) {
+  return renderBasePage(userData, 'cliente-form');
+}
+
+/**
  * renderCollections - Renderiza la página de cobranzas
  */
 function renderCollections(userData, params) {
@@ -1188,6 +1223,21 @@ function renderInvoices(userData, params) {
 function renderSettings(userData, params) {
   return renderBasePage(userData, 'settings');
 }
+
+/**
+ * renderProductForm - Renderiza el formulario de producto
+ */
+function renderProductForm(userData, params) {
+  return renderBasePage(userData, 'producto-form');
+}
+
+/**
+ * renderBulkProductEntry - Renderiza el formulario de ingreso masivo
+ */
+function renderBulkProductEntry(userData, params) {
+  return renderBasePage(userData, 'bulk-entry');
+}
+
 
 /**
  * renderManualLogin - Renderiza página de login manual
@@ -2255,15 +2305,32 @@ function getDashboardData() {
     
     // 3. Stock bajo
     try {
+      Logger.log('Obteniendo stock bajo...');
       const inventoryService = new InventoryService();
       const lowStockProducts = inventoryService.checkLowStock();
       
+      Logger.log('lowStockProducts recibidos: ' + lowStockProducts.length);
+      if (lowStockProducts.length > 0) {
+        Logger.log('Primer producto con stock bajo: ' + JSON.stringify(lowStockProducts[0]));
+      }
+      
       dashboardData.lowStockCount = lowStockProducts.length;
       
+      // Calcular total de unidades faltantes
+      let totalDeficit = 0;
+      for (let i = 0; i < lowStockProducts.length; i++) {
+        totalDeficit += lowStockProducts[i].deficit || 0;
+      }
+      dashboardData.lowStockTotalUnits = totalDeficit;
+      
       Logger.log('Productos con stock bajo: ' + lowStockProducts.length);
+      Logger.log('Total unidades faltantes: ' + totalDeficit);
     } catch (e) {
       Logger.log('Error al obtener stock bajo: ' + e.message);
+      Logger.log('Stack trace: ' + e.stack);
       // Continuar con valores por defecto
+      dashboardData.lowStockCount = 0;
+      dashboardData.lowStockTotalUnits = 0;
     }
     
     // 4. Cuotas vencidas
@@ -2480,5 +2547,202 @@ function include(filename) {
         </p>
       </div>
     `;
+  }
+}
+
+
+// ============================================================================
+// SYSTEM SETTINGS - Gestión de Configuración del Sistema
+// ============================================================================
+
+/**
+ * getSystemSettings - Obtiene todos los parámetros del sistema
+ * 
+ * Lee la hoja CFG_Params y retorna todos los parámetros como un objeto JSON.
+ * Normaliza números y booleanos para facilitar el uso en el cliente.
+ * 
+ * @returns {Object} Respuesta con parámetros del sistema
+ */
+function getSystemSettings() {
+  try {
+    Logger.log('=== getSystemSettings START ===');
+    
+    const ss = getActiveSpreadsheet();
+    const paramsSheet = ss.getSheetByName('CFG_Params');
+    
+    if (!paramsSheet) {
+      throw new Error('Hoja CFG_Params no encontrada');
+    }
+    
+    // Leer todos los parámetros
+    const data = paramsSheet.getDataRange().getValues();
+    const settings = {};
+    
+    // Saltar header (fila 0)
+    for (let i = 1; i < data.length; i++) {
+      const key = data[i][0];
+      let value = data[i][1];
+      
+      if (!key) continue;
+      
+      // Normalizar valores
+      // Si es número, convertir a número
+      if (!isNaN(value) && value !== '') {
+        value = Number(value);
+      }
+      // Si es booleano, convertir a booleano
+      else if (value === 'TRUE' || value === true) {
+        value = true;
+      }
+      else if (value === 'FALSE' || value === false) {
+        value = false;
+      }
+      
+      settings[key] = value;
+    }
+    
+    Logger.log('Parámetros cargados: ' + Object.keys(settings).length);
+    Logger.log('=== getSystemSettings END ===');
+    
+    return createSuccessResponse(settings);
+    
+  } catch (error) {
+    Logger.log('ERROR en getSystemSettings: ' + error.message);
+    Logger.log('Stack trace: ' + error.stack);
+    
+    return createErrorResponse(
+      'SETTINGS_ERROR',
+      'Error al obtener configuración del sistema',
+      { originalError: error.message }
+    );
+  }
+}
+
+/**
+ * updateSystemSettings - Actualiza parámetros del sistema
+ * 
+ * Actualiza masivamente la hoja CFG_Params con los nuevos valores.
+ * Invalida el caché y registra en auditoría.
+ * 
+ * @param {Object} payload - Datos de la solicitud
+ * @param {string} userEmail - Email del usuario que hace el cambio
+ * @returns {Object} Respuesta con resultado de la actualización
+ */
+function updateSystemSettings(payload, userEmail) {
+  try {
+    Logger.log('=== updateSystemSettings START ===');
+    Logger.log('User: ' + userEmail);
+    
+    // Parsear settings si viene como string
+    let newSettings = payload.settings;
+    if (typeof newSettings === 'string') {
+      newSettings = JSON.parse(newSettings);
+    }
+    
+    Logger.log('Nuevos settings: ' + JSON.stringify(newSettings));
+    
+    const ss = getActiveSpreadsheet();
+    const paramsSheet = ss.getSheetByName('CFG_Params');
+    
+    if (!paramsSheet) {
+      throw new Error('Hoja CFG_Params no encontrada');
+    }
+    
+    // Leer parámetros actuales para comparar
+    const data = paramsSheet.getDataRange().getValues();
+    const oldSettings = {};
+    const rowMap = {}; // Mapeo de key a número de fila
+    
+    for (let i = 1; i < data.length; i++) {
+      const key = data[i][0];
+      if (key) {
+        oldSettings[key] = data[i][1];
+        rowMap[key] = i + 1; // +1 porque getRange usa 1-based index
+      }
+    }
+    
+    // Actualizar cada parámetro
+    const changes = [];
+    
+    for (const key in newSettings) {
+      if (newSettings.hasOwnProperty(key)) {
+        const newValue = newSettings[key];
+        const oldValue = oldSettings[key];
+        
+        // Solo actualizar si cambió
+        if (newValue !== oldValue) {
+          const row = rowMap[key];
+          
+          if (row) {
+            // Actualizar valor existente
+            paramsSheet.getRange(row, 2).setValue(newValue);
+            
+            changes.push({
+              key: key,
+              oldValue: oldValue,
+              newValue: newValue
+            });
+            
+            Logger.log('Actualizado ' + key + ': ' + oldValue + ' → ' + newValue);
+          } else {
+            // Crear nuevo parámetro
+            const newRow = paramsSheet.getLastRow() + 1;
+            paramsSheet.getRange(newRow, 1, 1, 2).setValues([[key, newValue]]);
+            
+            changes.push({
+              key: key,
+              oldValue: null,
+              newValue: newValue
+            });
+            
+            Logger.log('Creado ' + key + ': ' + newValue);
+          }
+        }
+      }
+    }
+    
+    // Invalidar caché de configuración
+    try {
+      CacheService.getScriptCache().remove('system_params');
+      Logger.log('Caché de configuración invalidado');
+    } catch (e) {
+      Logger.log('Error al invalidar caché: ' + e.message);
+    }
+    
+    // Registrar en auditoría
+    if (changes.length > 0) {
+      try {
+        const auditRepo = new AuditRepository();
+        auditRepo.log(
+          'UPDATE_SYSTEM_SETTINGS',
+          'SYSTEM',
+          'CFG_Params',
+          oldSettings,
+          newSettings,
+          userEmail
+        );
+        Logger.log('Cambios registrados en auditoría');
+      } catch (e) {
+        Logger.log('Error al registrar auditoría: ' + e.message);
+      }
+    }
+    
+    Logger.log('Total de cambios: ' + changes.length);
+    Logger.log('=== updateSystemSettings END ===');
+    
+    return createSuccessResponse({
+      updated: changes.length,
+      changes: changes
+    });
+    
+  } catch (error) {
+    Logger.log('ERROR en updateSystemSettings: ' + error.message);
+    Logger.log('Stack trace: ' + error.stack);
+    
+    return createErrorResponse(
+      'SETTINGS_UPDATE_ERROR',
+      'Error al actualizar configuración del sistema',
+      { originalError: error.message }
+    );
   }
 }

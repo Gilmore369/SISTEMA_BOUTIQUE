@@ -330,3 +330,4 @@ console.log(window.SCRIPT_URL)
   * `md/SOLUCION_ERRORES_DASHBOARD_COLLECTIONS.md` - Detailed technical explanation
   * `INSTRUCCIONES_DESPLIEGUE_v1.8.md` - Step-by-step deployment guide for user
 - **FILEPATHS**: `gas/Code.gs`, `gas/index.html`, `md/SOLUCION_ERRORES_DASHBOARD_COLLECTIONS.md`, `INSTRUCCIONES_DESPLIEGUE_v1.8.md`
+![sa](image.png)

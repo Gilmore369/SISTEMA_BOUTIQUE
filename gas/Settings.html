@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es-PE">
+<head>
+  <meta charset="UTF-8">
+  <title>Configuración del Sistema - Adiction Boutique</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.min.css">
+</head>
+<body>
+  
+  <div class="container-fluid py-4">
+    
+    <h2><i class="bi bi-gear"></i> Configuración del Sistema</h2>
+    <p class="text-muted">Gestiona los parámetros operativos de tu boutique</p>
+    
+    <!-- Alert Container -->
+    <div id="alertContainer"></div>
+    
+    <!-- Settings Form -->
+    <form id="settingsForm">
+      
+      <!-- Información General -->
+      <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0"><i class="bi bi-shop"></i> Información General</h5>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label for="storeName" class="form-label">Nombre de la Tienda</label>
+              <input type="text" class="form-control" id="storeName" name="STORE_NAME" required>
+              <small class="form-text text-muted">Nombre principal de tu boutique</small>
+            </div>
+            <div class="col-md-6">
+              <label for="storeNameMujeres" class="form-label">Nombre Sección Mujeres</label>
+              <input type="text" class="form-control" id="storeNameMujeres" name="STORE_NAME_MUJERES">
+              <small class="form-text text-muted">Nombre para la sección de ropa de mujer</small>
+            </div>
+            <div class="col-md-6">
+              <label for="storeNameHombres" class="form-label">Nombre Sección Hombres</label>
+              <input type="text" class="form-control" id="storeNameHombres" name="STORE_NAME_HOMBRES">
+              <small class="form-text text-muted">Nombre para la sección de ropa de hombre</small>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Parámetros de Operación -->
+      <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+          <h5 class="mb-0"><i class="bi bi-sliders"></i> Parámetros de Operación</h5>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label for="minStockAlert" class="form-label">Alerta de Stock Mínimo</label>
+              <input type="number" class="form-control" id="minStockAlert" name="MIN_STOCK_ALERT" min="0" required>
+              <small class="form-text text-muted">Cantidad mínima antes de alertar</small>
+            </div>
+            <div class="col-md-4">
+              <label for="maxDiscount" class="form-label">Descuento Máximo sin Autorización (%)</label>
+              <input type="number" class="form-control" id="maxDiscount" name="MAX_DISCOUNT_WITHOUT_AUTH" min="0" max="100" step="0.01" required>
+              <small class="form-text text-muted">Porcentaje máximo de descuento</small>
+            </div>
+            <div class="col-md-4">
+              <label for="defaultCreditLimit" class="form-label">Límite de Crédito por Defecto (S/)</label>
+              <input type="number" class="form-control" id="defaultCreditLimit" name="DEFAULT_CREDIT_LIMIT" min="0" step="0.01" required>
+              <small class="form-text text-muted">Límite inicial para nuevos clientes</small>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Preferencias del Sistema -->
+      <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+          <h5 class="mb-0"><i class="bi bi-toggles"></i> Preferencias del Sistema</h5>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="enableBarcodeScanner" name="ENABLE_BARCODE_SCANNER">
+                <label class="form-check-label" for="enableBarcodeScanner">
+                  Habilitar Escáner de Código de Barras
+                </label>
+              </div>
+              <small class="form-text text-muted">Permite usar escáner en el POS</small>
+            </div>
+            <div class="col-md-6">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="enableCreditSales" name="ENABLE_CREDIT_SALES">
+                <label class="form-check-label" for="enableCreditSales">
+                  Habilitar Ventas a Crédito
+                </label>
+              </div>
+              <small class="form-text text-muted">Permite ventas con pago diferido</small>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Action Buttons -->
+      <div class="d-flex justify-content-end gap-2">
+        <button type="button" class="btn btn-secondary" onclick="loadSettings()">
+          <i class="bi bi-arrow-clockwise"></i> Recargar
+        </button>
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-save"></i> Guardar Cambios
+        </button>
+      </div>
+      
+    </form>
+    
+  </div>
+  
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <script>
+    // Load settings on page load
+    $(document).ready(function() {
+      loadSettings();
+    });
+    
+    /**
+     * Load current settings from server
+     */
+    function loadSettings() {
+      console.log('Cargando configuración...');
+      
+      $.ajax({
+        url: window.SCRIPT_URL,
+        type: 'POST',
+        data: {
+          action: 'getSystemSettings',
+          userEmail: window.USER_DATA ? window.USER_DATA.email : ''
+        },
+        success: function(response) {
+          console.log('Configuración recibida:', response);
+          
+          if (response && (response.success || response.ok) && response.data) {
+            populateForm(response.data);
+            showAlert('success', 'Configuración cargada correctamente');
+          } else {
+            showAlert('danger', 'Error al cargar configuración: ' + (response.error || 'Error desconocido'));
+          }
+        },
+        error: function(xhr, status, error) {
+          console.error('Error AJAX:', error);
+          showAlert('danger', 'Error de conexión al cargar configuración');
+        }
+      });
+    }
+    
+    /**
+     * Populate form with settings data
+     */
+    function populateForm(settings) {
+      // Text inputs
+      $('#storeName').val(settings.STORE_NAME || '');
+      $('#storeNameMujeres').val(settings.STORE_NAME_MUJERES || '');
+      $('#storeNameHombres').val(settings.STORE_NAME_HOMBRES || '');
+      $('#minStockAlert').val(settings.MIN_STOCK_ALERT || 5);
+      $('#maxDiscount').val(settings.MAX_DISCOUNT_WITHOUT_AUTH || 10);
+      $('#defaultCreditLimit').val(settings.DEFAULT_CREDIT_LIMIT || 500);
+      
+      // Checkboxes
+      $('#enableBarcodeScanner').prop('checked', settings.ENABLE_BARCODE_SCANNER === true || settings.ENABLE_BARCODE_SCANNER === 'TRUE');
+      $('#enableCreditSales').prop('checked', settings.ENABLE_CREDIT_SALES === true || settings.ENABLE_CREDIT_SALES === 'TRUE');
+    }
+    
+    /**
+     * Save settings to server
+     */
+    $('#settingsForm').on('submit', function(e) {
+      e.preventDefault();
+      
+      // Collect form data
+      const settings = {
+        STORE_NAME: $('#storeName').val(),
+        STORE_NAME_MUJERES: $('#storeNameMujeres').val(),
+        STORE_NAME_HOMBRES: $('#storeNameHombres').val(),
+        MIN_STOCK_ALERT: parseInt($('#minStockAlert').val()) || 5,
+        MAX_DISCOUNT_WITHOUT_AUTH: parseFloat($('#maxDiscount').val()) || 10,
+        DEFAULT_CREDIT_LIMIT: parseFloat($('#defaultCreditLimit').val()) || 500,
+        ENABLE_BARCODE_SCANNER: $('#enableBarcodeScanner').is(':checked'),
+        ENABLE_CREDIT_SALES: $('#enableCreditSales').is(':checked')
+      };
+      
+      console.log('Guardando configuración:', settings);
+      
+      // Disable submit button
+      const submitBtn = $(this).find('button[type="submit"]');
+      submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Guardando...');
+      
+      $.ajax({
+        url: window.SCRIPT_URL,
+        type: 'POST',
+        data: {
+          action: 'updateSystemSettings',
+          userEmail: window.USER_DATA ? window.USER_DATA.email : '',
+          settings: JSON.stringify(settings)
+        },
+        success: function(response) {
+          submitBtn.prop('disabled', false).html('<i class="bi bi-save"></i> Guardar Cambios');
+          
+          if (response && (response.success || response.ok)) {
+            showAlert('success', 'Configuración guardada exitosamente');
+            // Reload to show updated values
+            setTimeout(function() {
+              loadSettings();
+            }, 1000);
+          } else {
+            showAlert('danger', 'Error al guardar: ' + (response.error || 'Error desconocido'));
+          }
+        },
+        error: function(xhr, status, error) {
+          submitBtn.prop('disabled', false).html('<i class="bi bi-save"></i> Guardar Cambios');
+          console.error('Error AJAX:', error);
+          showAlert('danger', 'Error de conexión al guardar configuración');
+        }
+      });
+    });
+    
+    /**
+     * Show alert message
+     */
+    function showAlert(type, message) {
+      const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+          ${message}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      `;
+      $('#alertContainer').html(alertHtml);
+      
+      // Auto-dismiss after 5 seconds
+      setTimeout(function() {
+        $('.alert').alert('close');
+      }, 5000);
+    }
+  </script>
+  
+</body>
+</html>
