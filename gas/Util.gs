@@ -449,11 +449,9 @@ var LockManager = {
     var lock = LockService.getScriptLock();
     
     try {
-      var acquired = lock.waitLock(timeoutMs);
-      
-      if (!acquired) {
-        throw new Error('No se pudo adquirir el lock después de ' + timeoutMs + 'ms');
-      }
+      // CRÍTICO: waitLock() no retorna boolean, lanza excepción si falla
+      // Si tiene éxito, simplemente continúa sin retornar nada
+      lock.waitLock(timeoutMs);
       
       Logger.log('Lock adquirido: ' + lockKey);
       return lock;

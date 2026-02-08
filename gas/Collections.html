@@ -366,11 +366,17 @@
      * Initialize DataTables
      */
     function initializeTables() {
+      // CRÍTICO: Obtener parámetros de sesión para usar en los enlaces
+      const sessionUser = '<?= sessionUser ?>';
+      const sessionToken = '<?= sessionToken ?>';
+      
       const commonColumns = [
         { 
           data: 'client_name',
           render: function(data, type, row) {
-            return '<a href="?page=cliente-detalle&id=' + row.client_id + '">' + (data || 'Cliente') + '</a>';
+            // CRÍTICO: Incluir parámetros de sesión en el enlace
+            const clientUrl = '?page=cliente-detalle&id=' + row.client_id + '&user=' + encodeURIComponent(sessionUser) + '&token=' + encodeURIComponent(sessionToken);
+            return '<a href="' + clientUrl + '">' + (data || 'Cliente') + '</a>';
           }
         },
         { data: 'plan_id' },
@@ -834,7 +840,12 @@
         return;
       }
       
-      window.open('?page=recibo&id=' + currentReceiptId, '_blank');
+      // CRÍTICO: Construir URL con parámetros de sesión
+      const sessionUser = '<?= sessionUser ?>';
+      const sessionToken = '<?= sessionToken ?>';
+      const receiptUrl = '?page=recibo&id=' + currentReceiptId + '&user=' + encodeURIComponent(sessionUser) + '&token=' + encodeURIComponent(sessionToken);
+      
+      window.open(receiptUrl, '_blank');
     }
     
     /**

@@ -237,17 +237,12 @@
     
   </div>
   
-  <!-- jQuery -->
-  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-  
-  <!-- Bootstrap JS -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   
   <script>
     // Global variables
     let cart = [];
     let storeId = 'STORE_MUJERES'; // Default store
-    let warehouseId = 'WH_MUJERES'; // Default warehouse
+    let warehouseId = 'Mujeres'; // Default warehouse (debe coincidir con INV_Stock.warehouse_id)
     let userId = '<?= userEmail ?>';
     let userName = '<?= userName ?>';
     
@@ -287,6 +282,23 @@
       $('#productSearch').keypress(function(e) {
         if (e.which === 13) {
           searchProduct();
+        }
+      });
+      
+      // NUEVO: Búsqueda automática mientras escribe (con debounce)
+      let searchTimeout;
+      $('#productSearch').on('input', function() {
+        clearTimeout(searchTimeout);
+        const query = $(this).val().trim();
+        
+        if (query.length >= 2) {
+          // Esperar 500ms después de que el usuario deje de escribir
+          searchTimeout = setTimeout(function() {
+            searchProduct();
+          }, 500);
+        } else if (query.length === 0) {
+          // Ocultar resultados si el campo está vacío
+          $('#searchResults').hide();
         }
       });
     });
@@ -336,14 +348,43 @@
       
       let html = '';
       products.forEach(function(product) {
+        // Obtener stock actual del almacén
+        const stock = product.stock || 0;
+        const stockBadge = stock > 0 
+          ? `<span class="badge bg-success">Stock: ${stock}</span>` 
+          : `<span class="badge bg-danger">Sin Stock</span>`;
+        
+        // Construir información del producto
+        const category = product.category || 'Sin categoría';
+        const size = product.size || '';
+        const color = product.color || '';
+        const brand = product.brand_name || '';
+        const line = product.line_name || '';
+        
+        // Construir detalles adicionales
+        let details = [];
+        if (category) details.push('Categoría: ' + category);
+        if (line) details.push('Línea: ' + line);
+        if (brand) details.push('Marca: ' + brand);
+        if (size) details.push('Talla: ' + size);
+        if (color) details.push('Color: ' + color);
+        
+        const detailsText = details.join(' | ');
+        
         html += `
-          <a href="#" class="list-group-item list-group-item-action" onclick="addProductToCart('${product.id}'); return false;">
-            <div class="d-flex w-100 justify-content-between">
-              <h6 class="mb-1">${product.name}</h6>
-              <span class="badge bg-success">S/ ${parseFloat(product.price || 0).toFixed(2)}</span>
+          <a href="#" class="list-group-item list-group-item-action ${stock <= 0 ? 'disabled' : ''}" onclick="${stock > 0 ? `addProductToCart('${product.id}'); return false;` : 'return false;'}">
+            <div class="d-flex w-100 justify-content-between align-items-start">
+              <div class="flex-grow-1">
+                <h6 class="mb-1">${product.name}</h6>
+                <p class="mb-1 small">${product.description || ''}</p>
+                <small class="text-muted">Código: ${product.barcode}</small><br>
+                <small class="text-muted">${detailsText}</small>
+              </div>
+              <div class="text-end">
+                <div class="mb-1"><span class="badge bg-primary">S/ ${parseFloat(product.price || 0).toFixed(2)}</span></div>
+                <div>${stockBadge}</div>
+              </div>
             </div>
-            <p class="mb-1 small">${product.description || ''}</p>
-            <small class="text-muted">Código: ${product.barcode} | Categoría: ${product.category}</small>
           </a>
         `;
       });
@@ -558,7 +599,15 @@
     
     function cancelSale() {
       if (cart.length === 0) {
-        window.location.href = '?page=dashboard';
+        // CRÍTICO: Usar buildUrlWithSession para preservar sesión
+        if (window.buildUrlWithSession) {
+          window.location.href = window.buildUrlWithSession('dashboard');
+        } else {
+          // Fallback si la función no está disponible
+          const sessionUser = '<?= sessionUser ?>';
+          const sessionToken = '<?= sessionToken ?>';
+          window.location.href = '?page=dashboard&user=' + encodeURIComponent(sessionUser) + '&token=' + encodeURIComponent(sessionToken);
+        }
         return;
       }
       
@@ -587,12 +636,29 @@
     }
     
     function openScanner() {
+      // CRÍTICO: Usar la URL completa del script desde window.SCRIPT_URL
+      const sessionUser = '<?= sessionUser ?>';
+      const sessionToken = '<?= sessionToken ?>';
+      
+      // Construir URL completa con parámetros de sesión
+      let scannerUrl = window.SCRIPT_URL || '<?= scriptUrl ?>';
+      scannerUrl += '?page=barcode-scanner';
+      scannerUrl += '&user=' + encodeURIComponent(sessionUser);
+      scannerUrl += '&token=' + encodeURIComponent(sessionToken);
+      
+      console.log('Abriendo escáner en:', scannerUrl);
+      
       // Open scanner in a popup window
       const scannerWindow = window.open(
-        '?page=barcode-scanner',
+        scannerUrl,
         'BarcodeScanner',
         'width=800,height=600,resizable=yes,scrollbars=yes'
       );
+      
+      if (!scannerWindow) {
+        alert('No se pudo abrir el escáner. Por favor permita ventanas emergentes en su navegador.');
+        return;
+      }
       
       // Listen for barcode from scanner window
       window.addEventListener('message', function(event) {
@@ -608,8 +674,130 @@
     }
     
     function openNewClient() {
-      window.open('?page=cliente-form', '_blank');
+      // SOLUCIÓN: Usar modal de Bootstrap en lugar de abrir nueva ventana
+      // Crear modal dinámicamente
+      const modalHtml = `
+        <div class="modal fade" id="newClientModal" tabindex="-1" aria-labelledby="newClientModalLabel" aria-hidden="true">
+          <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="newClientModalLabel">
+                  <i class="bi bi-person-plus"></i> Nuevo Cliente
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <form id="quickClientForm">
+                  <div class="row">
+                    <div class="col-md-6 mb-3">
+                      <label for="clientName" class="form-label">Nombre Completo *</label>
+                      <input type="text" class="form-control" id="clientName" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                      <label for="clientDNI" class="form-label">DNI *</label>
+                      <input type="text" class="form-control" id="clientDNI" required maxlength="8" pattern="[0-9]{8}">
+                    </div>
+                  </div>
+                  <div class="row">
+                    <div class="col-md-6 mb-3">
+                      <label for="clientPhone" class="form-label">Teléfono *</label>
+                      <input type="tel" class="form-control" id="clientPhone" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                      <label for="clientEmail" class="form-label">Email</label>
+                      <input type="email" class="form-control" id="clientEmail">
+                    </div>
+                  </div>
+                  <div class="mb-3">
+                    <label for="clientAddress" class="form-label">Dirección</label>
+                    <input type="text" class="form-control" id="clientAddress">
+                  </div>
+                  <div class="row">
+                    <div class="col-md-6 mb-3">
+                      <label for="clientBirthday" class="form-label">Fecha de Nacimiento</label>
+                      <input type="date" class="form-control" id="clientBirthday">
+                    </div>
+                  </div>
+                </form>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                  <i class="bi bi-x-circle"></i> Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" onclick="saveQuickClient()">
+                  <i class="bi bi-save"></i> Guardar Cliente
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // Remover modal anterior si existe
+      $('#newClientModal').remove();
+      
+      // Agregar modal al body
+      $('body').append(modalHtml);
+      
+      // Mostrar modal
+      const modal = new bootstrap.Modal(document.getElementById('newClientModal'));
+      modal.show();
     }
+    
+    // Función para guardar cliente rápido
+    window.saveQuickClient = function() {
+      const clientData = {
+        name: $('#clientName').val().trim(),
+        dni: $('#clientDNI').val().trim(),
+        phone: $('#clientPhone').val().trim(),
+        email: $('#clientEmail').val().trim(),
+        address: $('#clientAddress').val().trim(),
+        birthday: $('#clientBirthday').val()
+      };
+      
+      // Validar campos requeridos
+      if (!clientData.name || !clientData.dni || !clientData.phone) {
+        alert('Por favor complete todos los campos requeridos (*)');
+        return;
+      }
+      
+      // Validar DNI
+      if (!/^[0-9]{8}$/.test(clientData.dni)) {
+        alert('El DNI debe tener 8 dígitos');
+        return;
+      }
+      
+      // Mostrar loading
+      const saveBtn = $('#newClientModal .btn-primary');
+      const originalText = saveBtn.html();
+      saveBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Guardando...');
+      
+      // Llamar al servidor para crear cliente
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response.success) {
+            // Cerrar modal
+            bootstrap.Modal.getInstance(document.getElementById('newClientModal')).hide();
+            
+            // Recargar lista de clientes
+            loadClients();
+            
+            // Seleccionar el nuevo cliente automáticamente
+            setTimeout(function() {
+              $('#clientSelect').val(response.data.id);
+              alert('Cliente creado exitosamente: ' + clientData.name);
+            }, 500);
+          } else {
+            alert('Error al crear cliente: ' + response.error);
+            saveBtn.prop('disabled', false).html(originalText);
+          }
+        })
+        .withFailureHandler(function(error) {
+          alert('Error al crear cliente: ' + error.message);
+          saveBtn.prop('disabled', false).html(originalText);
+        })
+        .createClientQuick(clientData);
+    };
     
     function printTicket(saleId) {
       // Call server to generate ticket HTML

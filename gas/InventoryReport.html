@@ -142,32 +142,25 @@
         
         console.log('Generando reporte para almacén:', warehouseId);
 
-        $.ajax({
-          url: window.SCRIPT_URL,
-          type: 'POST',
-          data: {
-            action: 'getInventoryReport',
-            warehouseId: warehouseId,
-            userEmail: window.USER_DATA ? window.USER_DATA.email : ''
-          },
-          success: function(response) {
+        // Usar google.script.run en lugar de AJAX
+        google.script.run
+          .withSuccessHandler(function(response) {
             console.log('Respuesta del servidor:', response);
             
             if (response && (response.success || response.ok)) {
               displayReport(response.data);
             } else {
-              alert('Error al generar reporte: ' + (response.error || 'Error desconocido'));
+              const errorMsg = response.error ? 
+                (typeof response.error === 'object' ? JSON.stringify(response.error) : response.error) : 
+                'Error desconocido';
+              alert('Error al generar reporte: ' + errorMsg);
             }
-          },
-          error: function(xhr, status, error) {
-            console.error('Error AJAX:', error);
-            if (window.handleDataTableError) {
-              window.handleDataTableError(xhr, error, status, 'inventoryTable');
-            } else {
-              alert('Error de conexión al generar reporte: ' + error);
-            }
-          }
-        });
+          })
+          .withFailureHandler(function(error) {
+            console.error('Error al generar reporte:', error);
+            alert('Error al generar reporte: ' + error.message);
+          })
+          .getInventoryReport(warehouseId);
       }
 
     function displayReport(report) {

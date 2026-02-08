@@ -26,6 +26,16 @@
   <!-- DataTables Bootstrap 5 CSS -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
   
+  <!-- CRÍTICO: jQuery DEBE cargarse en el HEAD para que esté disponible cuando se incluyan las páginas -->
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js" integrity="sha256-2Pmvv0kuTBOenSvLm6bvfBSSHrUJ+3A7x6P5Ebd07/g=" crossorigin="anonymous"></script>
+  
+  <!-- Bootstrap 5.3 JS Bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
+  
+  <!-- DataTables JS -->
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+  
   <style>
     /* Minimal custom styles */
     body {
@@ -406,16 +416,6 @@
     </div>
   </div>
   
-  <!-- jQuery (required for DataTables) -->
-  <script src="https://code.jquery.com/jquery-3.7.0.min.js" integrity="sha256-2Pmvv0kuTBOenSvLm6bvfBSSHrUJ+3A7x6P5Ebd07/g=" crossorigin="anonymous"></script>
-  
-  <!-- Bootstrap 5.3 JS Bundle -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
-  
-  <!-- DataTables JS -->
-  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-  <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-  
   <script>
     // User data from server - GLOBAL (DEBE estar antes de cualquier include)
     window.USER_DATA = {
@@ -452,35 +452,25 @@
     console.log('Window location:', window.location.href);
     console.log('User data:', USER_DATA);
     
+    // CRÍTICO: Parámetros de sesión desde el servidor (NO desde URL)
+    // Estos vienen del template y son más confiables que window.location
+    window.SESSION_USER = '<?= sessionUser ?>';
+    window.SESSION_TOKEN = '<?= sessionToken ?>';
+    
+    console.log('Session User:', window.SESSION_USER);
+    console.log('Session Token:', window.SESSION_TOKEN ? 'presente' : 'ausente');
+    
     // Navigation function - REFACTORIZADA para ser más robusta
     // GLOBAL para que los módulos incluidos puedan acceder
     window.navigateTo = function(page, params) {
       try {
-        // Obtener parámetros actuales de forma robusta
-        let urlParams;
-        try {
-          urlParams = new URLSearchParams(window.location.search);
-        } catch(e) {
-          console.error('Error al parsear URLSearchParams:', e);
-          urlParams = new URLSearchParams();
-        }
-        
-        // CRÍTICO: Preservar parámetros de sesión (usuario/contraseña O email)
-        const sessionUser = urlParams.get('user');
-        const sessionToken = urlParams.get('token');
-        const sessionEmail = urlParams.get('sessionEmail');
-        
         // Construir nueva URL
         let newUrl = window.SCRIPT_URL + '?page=' + encodeURIComponent(page);
         
-        // Preservar sesión de usuario/contraseña si existe
-        if (sessionUser && sessionToken) {
-          newUrl += '&user=' + encodeURIComponent(sessionUser);
-          newUrl += '&token=' + encodeURIComponent(sessionToken);
-        }
-        // O preservar sessionEmail si existe (fallback)
-        else if (sessionEmail) {
-          newUrl += '&sessionEmail=' + encodeURIComponent(sessionEmail);
+        // CRÍTICO: Usar parámetros de sesión del servidor (más confiable)
+        if (window.SESSION_USER && window.SESSION_TOKEN) {
+          newUrl += '&user=' + encodeURIComponent(window.SESSION_USER);
+          newUrl += '&token=' + encodeURIComponent(window.SESSION_TOKEN);
         }
         
         // Agregar parámetros adicionales si existen
@@ -514,6 +504,32 @@
     // Alias local para compatibilidad
     const navigateTo = window.navigateTo;
     
+    // NUEVA FUNCIÓN HELPER: Construir URL con parámetros de sesión
+    // GLOBAL para que todos los módulos incluidos puedan usarla
+    window.buildUrlWithSession = function(page, params) {
+      let url = '?page=' + encodeURIComponent(page);
+      
+      // CRÍTICO: Agregar parámetros de sesión
+      if (window.SESSION_USER && window.SESSION_TOKEN) {
+        url += '&user=' + encodeURIComponent(window.SESSION_USER);
+        url += '&token=' + encodeURIComponent(window.SESSION_TOKEN);
+      }
+      
+      // Agregar parámetros adicionales si existen
+      if (params) {
+        for (const key in params) {
+          if (params.hasOwnProperty(key)) {
+            url += '&' + encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
+          }
+        }
+      }
+      
+      return url;
+    };
+    
+    // Alias local para compatibilidad
+    const buildUrlWithSession = window.buildUrlWithSession;
+    
     // Función de logout
     function logout() {
       window.top.location.href = window.SCRIPT_URL + '?action=logout';
@@ -540,29 +556,10 @@
       
       console.log('Cargando datos del dashboard...');
       
-      // Usar AJAX POST en lugar de google.script.run para evitar problemas con null
-      $.ajax({
-        url: window.SCRIPT_URL,
-        type: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({
-          action: 'getDashboardData',
-          payload: {
-            userEmail: window.USER_DATA.email
-          }
-        }),
-        success: function(response) {
+      // Usar google.script.run (método correcto para Google Apps Script)
+      google.script.run
+        .withSuccessHandler(function(response) {
           console.log('Dashboard data recibida:', response);
-          
-          // Parsear respuesta si es string
-          if (typeof response === 'string') {
-            try {
-              response = JSON.parse(response);
-            } catch(e) {
-              console.error('Error al parsear respuesta:', e);
-              return;
-            }
-          }
           
           // Validar que response no sea null
           if (!response) {
@@ -570,6 +567,7 @@
             return;
           }
           
+          // response ya viene como objeto desde wrapResponse
           if (response.success || response.ok) {
             const data = response.data;
             
@@ -579,14 +577,25 @@
               return;
             }
             
+            console.log('=== DATOS DEL DASHBOARD ===');
+            console.log('salesToday:', data.salesToday);
+            console.log('collectionsToday:', data.collectionsToday);
+            console.log('lowStockCount:', data.lowStockCount);
+            console.log('overdueCount:', data.overdueCount);
+            console.log('stalledInventoryCount:', data.stalledInventoryCount);
+            console.log('recentSales:', data.recentSales);
+            
             // Actualizar cards
             if (data.salesToday !== undefined) {
+              console.log('Actualizando salesToday...');
               $('#salesTodayAmount').text('S/ ' + parseFloat(data.salesToday).toFixed(2));
             }
             if (data.collectionsToday !== undefined) {
+              console.log('Actualizando collectionsToday...');
               $('#collectionsTodayAmount').text('S/ ' + parseFloat(data.collectionsToday).toFixed(2));
             }
             if (data.lowStockCount !== undefined) {
+              console.log('Actualizando lowStockCount...');
               $('#lowStockCount').text(data.lowStockCount);
               // Mostrar detalles adicionales si hay datos
               if (data.lowStockCount > 0 && data.lowStockTotalUnits !== undefined) {
@@ -598,26 +607,31 @@
               }
             }
             if (data.overdueCount !== undefined) {
+              console.log('Actualizando overdueCount...');
               $('#overdueCount').text(data.overdueCount);
             }
             if (data.stalledInventoryCount !== undefined) {
+              console.log('Actualizando stalledInventoryCount...');
               $('#stalledInventoryCount').text(data.stalledInventoryCount);
             }
             
             // Actualizar tabla de últimas ventas si hay datos
             if (data.recentSales && data.recentSales.length > 0) {
+              console.log('Actualizando tabla de ventas...');
               updateRecentSalesTable(data.recentSales);
+            } else {
+              console.log('No hay ventas recientes para mostrar');
             }
+            
+            console.log('✅ Dashboard actualizado correctamente');
           } else {
             console.error('Error en respuesta del dashboard:', response.error);
           }
-        },
-        error: function(xhr, status, error) {
+        })
+        .withFailureHandler(function(error) {
           console.error('Error al cargar dashboard:', error);
-          console.error('Status:', status);
-          console.error('Response:', xhr.responseText);
-        }
-      });
+        })
+        .getDashboardData();
     }
     
     // Actualizar tabla de ventas recientes

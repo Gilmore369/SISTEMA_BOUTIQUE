@@ -28,7 +28,7 @@
     <!-- Page Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h2><i class="bi bi-box-seam"></i> Catálogo de Productos</h2>
-      <button type="button" class="btn btn-primary" onclick="window.location.href='?page=producto-form'">
+      <button type="button" class="btn btn-primary" onclick="if(window.buildUrlWithSession){window.location.href=window.buildUrlWithSession('producto-form')}else{window.location.href='?page=producto-form&user=<?= sessionUser ?>&token=<?= sessionToken ?>'}">
         <i class="bi bi-plus-circle"></i> Nuevo Producto
       </button>
     </div>
@@ -82,6 +82,7 @@
               <th>Descripción</th>
               <th>Categoría</th>
               <th>Precio</th>
+              <th>Stock</th>
               <th>Stock Mín.</th>
               <th>Estado</th>
               <th>Acciones</th>
@@ -127,6 +128,8 @@
             d.action = 'getProducts';
             d.category = $('#filterCategory').val();
             d.status = $('#filterStatus').val();
+            // CRÍTICO: Enviar userEmail para autenticación
+            d.userEmail = window.USER_DATA ? window.USER_DATA.email : '';
           },
           dataSrc: function(json) {
             if (!json.success) {
@@ -146,11 +149,30 @@
               return data.length > 50 ? data.substring(0, 50) + '...' : data;
             }
           },
-          { data: 'category' },
+          { 
+            data: 'category',
+            render: function(data, type, row) {
+              // CRÍTICO: Ahora el servidor envía el campo 'category' con el nombre
+              return data || '<span class="text-muted">Sin categoría</span>';
+            }
+          },
           { 
             data: 'price',
             render: function(data) {
               return 'S/ ' + parseFloat(data || 0).toFixed(2);
+            }
+          },
+          { 
+            data: 'stock',
+            render: function(data) {
+              const stock = parseInt(data) || 0;
+              if (stock <= 0) {
+                return '<span class="badge bg-danger">Sin Stock</span>';
+              } else if (stock < 10) {
+                return '<span class="badge bg-warning text-dark">' + stock + '</span>';
+              } else {
+                return '<span class="badge bg-success">' + stock + '</span>';
+              }
             }
           },
           { data: 'min_stock' },
@@ -196,11 +218,19 @@
     }
     
     function editProduct(productId) {
-      window.location.href = '?page=producto-form&id=' + productId;
+      if (window.buildUrlWithSession) {
+        window.location.href = window.buildUrlWithSession('producto-form', {id: productId});
+      } else {
+        window.location.href = '?page=producto-form&id=' + productId + '&user=<?= sessionUser ?>&token=<?= sessionToken ?>';
+      }
     }
     
     function viewStock(productId) {
-      window.location.href = '?page=stock-view&productId=' + productId;
+      if (window.buildUrlWithSession) {
+        window.location.href = window.buildUrlWithSession('stock-view', {productId: productId});
+      } else {
+        window.location.href = '?page=stock-view&productId=' + productId + '&user=<?= sessionUser ?>&token=<?= sessionToken ?>';
+      }
     }
   </script>
   

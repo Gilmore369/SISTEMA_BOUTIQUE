@@ -40,18 +40,221 @@
  */
 
 // ============================================================================
-// AUTENTICACIÓN CON USUARIO/CONTRASEÑA
+// AUTENTICACIÓN CON USUARIO/CONTRASEÑA DESDE BASE DE DATOS
 // ============================================================================
 
-const USERS = {
-  'admin': 'admin123',
-  'gian': 'gian123',
-  'vendedor': 'vendedor123'
-};
+/**
+ * validateUserCredentials - Valida credenciales contra CFG_Users
+ * 
+ * @param {string} email - Email del usuario
+ * @param {string} password - Contraseña del usuario
+ * @returns {Object|null} Objeto con datos del usuario si es válido, null si no
+ */
+function validateUserCredentials(email, password) {
+  try {
+    Logger.log('=== validateUserCredentials START ===');
+    Logger.log('Validando credenciales para: ' + email);
+    
+    // Normalizar email
+    const normalizedEmail = email.trim().toLowerCase();
+    
+    // Acceso directo a la hoja CFG_Users
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('CFG_Users');
+    
+    if (!sheet) {
+      Logger.log('ERROR: hoja CFG_Users no encontrada');
+      return null;
+    }
+    
+    const data = sheet.getDataRange().getValues();
+    Logger.log('Total de filas en CFG_Users: ' + data.length);
+    
+    // Buscar usuario
+    // Columnas: [0]=id, [1]=email, [2]=name, [3]=roles, [4]=stores, [5]=active, [6]=created_at, [7]=password
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const cellEmail = row[1];
+      
+      // Normalizar el email de la celda
+      if (cellEmail && typeof cellEmail === 'string') {
+        const normalizedCellEmail = cellEmail.trim().toLowerCase();
+        
+        if (normalizedCellEmail === normalizedEmail) {
+          Logger.log('Usuario encontrado en fila ' + (i + 1));
+          
+          // Verificar si está activo
+          const activeValue = row[5];
+          const isActive = activeValue === true || activeValue === 'TRUE' || activeValue === 'true' || activeValue === 1;
+          
+          if (!isActive) {
+            Logger.log('Usuario inactivo');
+            return null;
+          }
+          
+          // Verificar contraseña (columna 7)
+          const storedPassword = row[7];
+          
+          if (!storedPassword) {
+            Logger.log('Usuario no tiene contraseña configurada');
+            return null;
+          }
+          
+          if (storedPassword !== password) {
+            Logger.log('Contraseña incorrecta');
+            return null;
+          }
+          
+          // Credenciales válidas - retornar datos del usuario
+          Logger.log('✅ Credenciales válidas');
+          
+          // Parsear roles
+          let roles = [];
+          try {
+            if (row[3]) {
+              roles = JSON.parse(row[3]);
+            }
+          } catch (e) {
+            Logger.log('Error al parsear roles: ' + e.message);
+            roles = ['Vendedor']; // Rol por defecto
+          }
+          
+          return {
+            email: cellEmail,
+            name: row[2] || cellEmail.split('@')[0],
+            roles: roles,
+            stores: row[4] || ''
+          };
+        }
+      }
+    }
+    
+    Logger.log('Usuario no encontrado: ' + normalizedEmail);
+    return null;
+    
+  } catch (error) {
+    Logger.log('ERROR en validateUserCredentials: ' + error.message);
+    Logger.log('Stack trace: ' + error.stack);
+    return null;
+  }
+}
 
-function generateToken(username) {
-  const date = new Date().toDateString();
-  return Utilities.base64Encode(username + ':' + date);
+function generateToken(email) {
+  // Token válido por 1 hora
+  const expirationTime = new Date().getTime() + (60 * 60 * 1000); // 1 hora en milisegundos
+  return Utilities.base64Encode(email + ':' + expirationTime);
+}
+
+function validateToken(email, token) {
+  try {
+    // Decodificar token
+    const decoded = Utilities.newBlob(Utilities.base64Decode(token)).getDataAsString();
+    const parts = decoded.split(':');
+    
+    if (parts.length !== 2) {
+      Logger.log('Token inválido: formato incorrecto');
+      return false;
+    }
+    
+    const tokenEmail = parts[0];
+    const expirationTime = parseInt(parts[1]);
+    
+    // Verificar que el email coincida
+    if (tokenEmail !== email) {
+      Logger.log('Token inválido: email no coincide');
+      return false;
+    }
+    
+    // Verificar que no haya expirado
+    const now = new Date().getTime();
+    if (now > expirationTime) {
+      Logger.log('Token expirado');
+      return false;
+    }
+    
+    Logger.log('✅ Token válido');
+    return true;
+    
+  } catch (error) {
+    Logger.log('Error al validar token: ' + error.message);
+    return false;
+  }
+}
+
+/**
+ * getUserDataByEmail - Obtiene los datos completos de un usuario por email
+ * 
+ * @param {string} email - Email del usuario
+ * @returns {Object|null} Objeto con datos del usuario o null si no existe
+ */
+function getUserDataByEmail(email) {
+  try {
+    Logger.log('=== getUserDataByEmail START ===');
+    Logger.log('Buscando usuario: ' + email);
+    
+    // Normalizar email
+    const normalizedEmail = email.trim().toLowerCase();
+    
+    // Acceso directo a la hoja CFG_Users
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('CFG_Users');
+    
+    if (!sheet) {
+      Logger.log('ERROR: hoja CFG_Users no encontrada');
+      return null;
+    }
+    
+    const data = sheet.getDataRange().getValues();
+    
+    // Buscar usuario
+    // Columnas: [0]=id, [1]=email, [2]=name, [3]=roles, [4]=stores, [5]=active, [6]=created_at, [7]=password
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const cellEmail = row[1];
+      
+      if (cellEmail && typeof cellEmail === 'string') {
+        const normalizedCellEmail = cellEmail.trim().toLowerCase();
+        
+        if (normalizedCellEmail === normalizedEmail) {
+          Logger.log('Usuario encontrado');
+          
+          // Verificar si está activo
+          const activeValue = row[5];
+          const isActive = activeValue === true || activeValue === 'TRUE' || activeValue === 'true' || activeValue === 1;
+          
+          if (!isActive) {
+            Logger.log('Usuario inactivo');
+            return null;
+          }
+          
+          // Parsear roles
+          let roles = [];
+          try {
+            if (row[3]) {
+              roles = JSON.parse(row[3]);
+            }
+          } catch (e) {
+            Logger.log('Error al parsear roles: ' + e.message);
+            roles = ['Vendedor']; // Rol por defecto
+          }
+          
+          return {
+            email: cellEmail,
+            name: row[2] || cellEmail.split('@')[0],
+            roles: roles,
+            stores: row[4] || ''
+          };
+        }
+      }
+    }
+    
+    Logger.log('Usuario no encontrado: ' + normalizedEmail);
+    return null;
+    
+  } catch (error) {
+    Logger.log('ERROR en getUserDataByEmail: ' + error.message);
+    return null;
+  }
 }
 
 function renderLoginUserPass(attemptedUser, message) {
@@ -65,30 +268,163 @@ function renderLoginUserPass(attemptedUser, message) {
     '<meta name="viewport" content="width=device-width, initial-scale=1">' +
     '<title>Login - Adiction Boutique</title>' +
     '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">' +
+    '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.min.css">' +
     '<style>' +
-    'body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }' +
-    '.login-box { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); max-width: 400px; width: 100%; }' +
-    'h1 { text-align: center; color: #333; margin-bottom: 30px; }' +
-    '.btn-primary { width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; }' +
+    'body { ' +
+    '  background: #f8fafc; ' +
+    '  min-height: 100vh; ' +
+    '  display: flex; ' +
+    '  align-items: center; ' +
+    '  justify-content: center; ' +
+    '  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; ' +
+    '}' +
+    '.login-container { ' +
+    '  background: white; ' +
+    '  padding: 0; ' +
+    '  border-radius: 20px; ' +
+    '  box-shadow: 0 20px 60px rgba(0,0,0,0.3); ' +
+    '  max-width: 900px; ' +
+    '  width: 100%; ' +
+    '  overflow: hidden; ' +
+    '  display: flex; ' +
+    '}' +
+    '.login-left { ' +
+    '  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); ' +
+    '  color: white; ' +
+    '  padding: 60px 40px; ' +
+    '  flex: 1; ' +
+    '  display: flex; ' +
+    '  flex-direction: column; ' +
+    '  justify-content: center; ' +
+    '}' +
+    '.login-right { ' +
+    '  padding: 60px 50px; ' +
+    '  flex: 1; ' +
+    '}' +
+    '.brand { ' +
+    '  font-size: 2.5em; ' +
+    '  font-weight: 700; ' +
+    '  margin-bottom: 20px; ' +
+    '  display: flex; ' +
+    '  align-items: center; ' +
+    '  gap: 15px; ' +
+    '}' +
+    '.brand-icon { ' +
+    '  font-size: 1.2em; ' +
+    '}' +
+    '.tagline { ' +
+    '  font-size: 1.1em; ' +
+    '  opacity: 0.9; ' +
+    '  line-height: 1.6; ' +
+    '}' +
+    '.login-title { ' +
+    '  font-size: 1.8em; ' +
+    '  font-weight: 600; ' +
+    '  color: #1e293b; ' +
+    '  margin-bottom: 10px; ' +
+    '}' +
+    '.login-subtitle { ' +
+    '  color: #64748b; ' +
+    '  margin-bottom: 30px; ' +
+    '}' +
+    '.form-label { ' +
+    '  font-weight: 500; ' +
+    '  color: #334155; ' +
+    '  margin-bottom: 8px; ' +
+    '}' +
+    '.form-control { ' +
+    '  padding: 12px 16px; ' +
+    '  border: 2px solid #e2e8f0; ' +
+    '  border-radius: 10px; ' +
+    '  font-size: 1em; ' +
+    '  transition: all 0.3s; ' +
+    '}' +
+    '.form-control:focus { ' +
+    '  border-color: #2563eb; ' +
+    '  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1); ' +
+    '}' +
+    '.btn-login { ' +
+    '  width: 100%; ' +
+    '  padding: 14px; ' +
+    '  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); ' +
+    '  border: none; ' +
+    '  border-radius: 10px; ' +
+    '  color: white; ' +
+    '  font-weight: 600; ' +
+    '  font-size: 1.05em; ' +
+    '  transition: transform 0.2s, box-shadow 0.2s; ' +
+    '}' +
+    '.btn-login:hover { ' +
+    '  transform: translateY(-2px); ' +
+    '  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.3); ' +
+    '}' +
+    '.alert { ' +
+    '  border-radius: 10px; ' +
+    '  border: none; ' +
+    '  padding: 12px 16px; ' +
+    '}' +
+    '.features { ' +
+    '  margin-top: 40px; ' +
+    '}' +
+    '.feature-item { ' +
+    '  display: flex; ' +
+    '  align-items: center; ' +
+    '  gap: 12px; ' +
+    '  margin-bottom: 16px; ' +
+    '  opacity: 0.9; ' +
+    '}' +
+    '.feature-icon { ' +
+    '  font-size: 1.3em; ' +
+    '}' +
+    '@media (max-width: 768px) { ' +
+    '  .login-container { flex-direction: column; max-width: 400px; } ' +
+    '  .login-left { padding: 40px 30px; } ' +
+    '  .login-right { padding: 40px 30px; } ' +
+    '}' +
     '</style>' +
     '</head>' +
     '<body>' +
-    '<div class="login-box">' +
-    '<h1>🛍️ Adiction Boutique</h1>' +
+    '<div class="login-container">' +
+    '<div class="login-left">' +
+    '<div class="brand">' +
+    '<i class="bi bi-shop brand-icon"></i>' +
+    '<span>Adiction Boutique</span>' +
+    '</div>' +
+    '<p class="tagline">Sistema de gestión integral para tu boutique. Controla ventas, inventario, clientes y más.</p>' +
+    '<div class="features">' +
+    '<div class="feature-item">' +
+    '<i class="bi bi-check-circle-fill feature-icon"></i>' +
+    '<span>Punto de venta rápido</span>' +
+    '</div>' +
+    '<div class="feature-item">' +
+    '<i class="bi bi-check-circle-fill feature-icon"></i>' +
+    '<span>Control de inventario</span>' +
+    '</div>' +
+    '<div class="feature-item">' +
+    '<i class="bi bi-check-circle-fill feature-icon"></i>' +
+    '<span>Gestión de créditos</span>' +
+    '</div>' +
+    '<div class="feature-item">' +
+    '<i class="bi bi-check-circle-fill feature-icon"></i>' +
+    '<span>Reportes en tiempo real</span>' +
+    '</div>' +
+    '</div>' +
+    '</div>' +
+    '<div class="login-right">' +
+    '<h2 class="login-title">Iniciar Sesión</h2>' +
+    '<p class="login-subtitle">Ingresa tus credenciales para continuar</p>' +
     (message ? '<div class="alert alert-' + (message.includes('correctamente') || message.includes('exitoso') ? 'success' : 'danger') + '">' + message + '</div>' : '') +
     '<form method="POST" action="' + scriptUrl + '">' +
     '<div class="mb-3">' +
-    '<label class="form-label">Usuario</label>' +
-    '<input type="text" name="username" class="form-control" value="' + (attemptedUser || '') + '" required autofocus>' +
+    '<label class="form-label"><i class="bi bi-envelope"></i> Email</label>' +
+    '<input type="email" name="username" class="form-control" value="' + (attemptedUser || '') + '" required autofocus placeholder="tu@email.com">' +
     '</div>' +
-    '<div class="mb-3">' +
-    '<label class="form-label">Contraseña</label>' +
-    '<input type="password" name="password" class="form-control" required>' +
+    '<div class="mb-4">' +
+    '<label class="form-label"><i class="bi bi-lock"></i> Contraseña</label>' +
+    '<input type="password" name="password" class="form-control" required placeholder="••••••••">' +
     '</div>' +
-    '<button type="submit" class="btn btn-primary">Iniciar Sesión</button>' +
+    '<button type="submit" class="btn btn-login">Iniciar Sesión</button>' +
     '</form>' +
-    '<div class="mt-4 text-center text-muted">' +
-    '<small><strong>Usuarios:</strong><br>admin / admin123<br>gian / gian123<br>vendedor / vendedor123</small>' +
     '</div>' +
     '</div>' +
     '</body>' +
@@ -150,63 +486,72 @@ function doGet(e) {
     
     // Si hay sesión de usuario/contraseña, validar token
     if (sessionUser && sessionToken) {
-      const expectedToken = generateToken(sessionUser);
-      if (sessionToken === expectedToken) {
+      if (validateToken(sessionUser, sessionToken)) {
         Logger.log('✅ Sesión válida para usuario: ' + sessionUser);
         
-        // Crear userData para el sistema
-        const userData = {
-          email: sessionUser + '@adictionboutique.com',
-          name: sessionUser,
-          roles: ['Admin', 'Vendedor']
-        };
+        // Obtener datos reales del usuario desde CFG_Users
+        const userData = getUserDataByEmail(sessionUser);
+        
+        if (!userData) {
+          Logger.log('ERROR: Usuario no encontrado en CFG_Users: ' + sessionUser);
+          return renderLoginUserPass('', 'Sesión inválida. Por favor, inicie sesión nuevamente.');
+        }
         
         // Parsear parámetros de URL
         const params = parseUrlParams(e.parameter);
         const page = params.page || 'dashboard';
         
+        // CRÍTICO: Crear objeto con parámetros de sesión para preservarlos
+        const sessionParams = {
+          user: sessionUser,
+          token: sessionToken
+        };
+        
+        Logger.log('=== SESSION PARAMS CREATED ===');
+        Logger.log('sessionParams.user: ' + sessionParams.user);
+        Logger.log('sessionParams.token: ' + sessionParams.token);
         Logger.log('Routing to page: ' + page);
         
         // Enrutar según la página solicitada
         switch (page) {
           case 'dashboard':
-            return renderDashboard(userData, params);
+            return renderDashboard(userData, params, sessionParams);
           case 'pos':
-            return renderPOS(userData, params);
+            return renderPOS(userData, params, sessionParams);
           case 'barcode-scanner':
-            return renderBarcodeScanner(userData, params);
+            return renderBarcodeScanner(userData, params, sessionParams);
           case 'inventory':
-            return renderInventory(userData, params);
+            return renderInventory(userData, params, sessionParams);
           case 'products':
           case 'productos':
-            return renderProducts(userData, params);
+            return renderProducts(userData, params, sessionParams);
           case 'bulk-entry':
           case 'ingreso-masivo':
-            return renderBulkProductEntry(userData, params);
+            return renderBulkProductEntry(userData, params, sessionParams);
           case 'clients':
-            return renderClients(userData, params);
+            return renderClients(userData, params, sessionParams);
           case 'cliente-form':
-            return renderClientForm(userData, params);
+            return renderClientForm(userData, params, sessionParams);
           case 'collections':
-            return renderCollections(userData, params);
+            return renderCollections(userData, params, sessionParams);
           case 'cash':
-            return renderCash(userData, params);
+            return renderCash(userData, params, sessionParams);
           case 'reports':
-            return renderReports(userData, params);
+            return renderReports(userData, params, sessionParams);
           case 'invoices':
-            return renderInvoices(userData, params);
+            return renderInvoices(userData, params, sessionParams);
           case 'producto-form':
-            return renderProductForm(userData, params);
+            return renderProductForm(userData, params, sessionParams);
           case 'settings':
-            return renderSettings(userData, params);
+            return renderSettings(userData, params, sessionParams);
           case 'stalled-inventory':
-            return renderStalledInventory(userData, params);
+            return renderStalledInventory(userData, params, sessionParams);
           case 'suppliers':
-            return renderSuppliers(userData, params);
+            return renderSuppliers(userData, params, sessionParams);
           case 'purchases':
-            return renderPurchases(userData, params);
+            return renderPurchases(userData, params, sessionParams);
           default:
-            return renderDashboard(userData, params);
+            return renderDashboard(userData, params, sessionParams);
         }
       }
     }
@@ -404,57 +749,62 @@ function doPost(e) {
     // ========================================================================
     
     if (e.parameter && e.parameter.username && e.parameter.password) {
-      const username = e.parameter.username;
+      const email = e.parameter.username; // Ahora es email
       const password = e.parameter.password;
       
-      Logger.log('Login attempt for: ' + username);
+      Logger.log('Login attempt for: ' + email);
       
-      // Validar credenciales
-      if (USERS[username] && USERS[username] === password) {
-        Logger.log('✅ Login exitoso para: ' + username);
+      // Validar credenciales contra CFG_Users
+      const userData = validateUserCredentials(email, password);
+      
+      if (userData) {
+        Logger.log('✅ Login exitoso para: ' + email);
         
         // Generar token
-        const token = generateToken(username);
+        const token = generateToken(email);
         
         // Construir URL de redirección con parámetros de sesión
         const scriptUrl = ScriptApp.getService().getUrl();
-        const redirectUrl = scriptUrl + '?user=' + encodeURIComponent(username) + '&token=' + encodeURIComponent(token) + '&page=dashboard';
+        const redirectUrl = scriptUrl + '?user=' + encodeURIComponent(email) + '&token=' + encodeURIComponent(token) + '&page=dashboard';
         
         Logger.log('Redirigiendo a: ' + redirectUrl);
         
-        // CRÍTICO: Usar window.top.location.href para salir del iframe
-        // Esto funciona en modo incógnito porque fuerza la navegación en la ventana superior
+        // CRÍTICO: En modo incógnito, window.top.location.href requiere user gesture
+        // Solución: Mostrar botón que el usuario debe hacer click
         const html = '<!DOCTYPE html>' +
           '<html lang="es">' +
           '<head>' +
           '<meta charset="utf-8">' +
-          '<title>Iniciando sesión...</title>' +
+          '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+          '<title>Acceso Autorizado</title>' +
+          '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.min.css">' +
           '<style>' +
-          'body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }' +
-          '.spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid white; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }' +
-          '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }' +
+          'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #f8fafc; min-height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; padding: 20px; }' +
+          '.container { background: white; padding: 50px 40px; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.15); max-width: 480px; width: 100%; text-align: center; }' +
+          '.success-circle { width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 25px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3); }' +
+          '.success-circle i { font-size: 2.5em; color: white; }' +
+          'h2 { margin-bottom: 12px; font-size: 1.75em; color: #1e293b; font-weight: 600; letter-spacing: -0.5px; }' +
+          '.welcome-text { font-size: 1.1em; margin-bottom: 8px; color: #475569; line-height: 1.6; }' +
+          '.welcome-text strong { color: #2563eb; font-weight: 600; }' +
+          '.subtitle { color: #64748b; margin-bottom: 35px; font-size: 0.95em; }' +
+          '.btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 16px 45px; background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); color: white; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 1.05em; transition: all 0.3s ease; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(37, 99, 235, 0.2); }' +
+          '.btn:hover { transform: translateY(-3px); box-shadow: 0 12px 25px rgba(37, 99, 235, 0.35); }' +
+          '.btn i { font-size: 1.2em; }' +
+          '.divider { height: 1px; background: linear-gradient(to right, transparent, #e2e8f0, transparent); margin: 30px 0 25px; }' +
+          '.info-text { color: #94a3b8; font-size: 0.85em; }' +
+          '@media (max-width: 480px) { .container { padding: 40px 30px; } h2 { font-size: 1.5em; } }' +
           '</style>' +
           '</head>' +
           '<body>' +
-          '<h2>✅ Login exitoso</h2>' +
-          '<div class="spinner"></div>' +
-          '<p>Iniciando sesión, por favor espere...</p>' +
-          '<script>' +
-          'try {' +
-          '  if (window.top && window.top.location) {' +
-          '    window.top.location.href = "' + redirectUrl + '";' +
-          '  } else {' +
-          '    window.location.href = "' + redirectUrl + '";' +
-          '  }' +
-          '} catch(e) {' +
-          '  console.error("Error en redirección:", e);' +
-          '  window.location.href = "' + redirectUrl + '";' +
-          '}' +
-          '</script>' +
-          '<noscript>' +
-          '<meta http-equiv="refresh" content="0;url=' + redirectUrl + '">' +
-          '</noscript>' +
-          '<p><a href="' + redirectUrl + '" target="_top" style="color: white; text-decoration: underline;">Si no es redirigido automáticamente, haga clic aquí</a></p>' +
+          '<div class="container">' +
+          '<div class="success-circle"><i class="bi bi-check-lg"></i></div>' +
+          '<h2>¡Acceso Autorizado!</h2>' +
+          '<p class="welcome-text">Bienvenido, <strong>' + userData.name + '</strong></p>' +
+          '<p class="subtitle">Tu sesión ha sido iniciada correctamente</p>' +
+          '<a href="' + redirectUrl + '" target="_top" class="btn"><i class="bi bi-arrow-right-circle-fill"></i>Continuar al Dashboard</a>' +
+          '<div class="divider"></div>' +
+          '<p class="info-text"><i class="bi bi-shield-check"></i> Conexión segura establecida</p>' +
+          '</div>' +
           '</body>' +
           '</html>';
         
@@ -462,8 +812,8 @@ function doPost(e) {
           .setTitle('Iniciando sesión...')
           .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
       } else {
-        Logger.log('❌ Login fallido para: ' + username);
-        return renderLoginUserPass(username, 'Usuario o contraseña incorrectos');
+        Logger.log('❌ Login fallido para: ' + email);
+        return renderLoginUserPass(email, 'Email o contraseña incorrectos');
       }
     }
     
@@ -862,12 +1212,73 @@ function handleProductAction(action, payload, userEmail) {
     if (action === 'getProducts') {
       const products = productRepo.findAll();
       
+      // CRÍTICO: Enriquecer productos con nombres de categoría, línea, marca y stock
+      const categoryRepo = new CategoryRepository();
+      const lineRepo = new LineRepository();
+      const brandRepo = new BrandRepository();
+      const stockRepo = new StockRepository();
+      
+      // Obtener todas las categorías, líneas y marcas de una vez (más eficiente)
+      const categories = categoryRepo.findAll();
+      const lines = lineRepo.findAll();
+      const brands = brandRepo.findAll();
+      const stockRecords = stockRepo.findAll();
+      
+      // Crear mapas para búsqueda rápida
+      const categoryMap = {};
+      categories.forEach(function(cat) {
+        categoryMap[cat.id] = cat.name;
+      });
+      
+      const lineMap = {};
+      lines.forEach(function(line) {
+        lineMap[line.id] = line.name;
+      });
+      
+      const brandMap = {};
+      brands.forEach(function(brand) {
+        brandMap[brand.id] = brand.name;
+      });
+      
+      // Crear mapa de stock por producto (asumiendo almacén Mujeres por defecto)
+      const stockMap = {};
+      stockRecords.forEach(function(stock) {
+        if (stock.warehouse_id === 'Mujeres') {
+          stockMap[stock.product_id] = stock.quantity || 0;
+        }
+      });
+      
+      // Enriquecer cada producto
+      const enrichedProducts = products.map(function(product) {
+        return {
+          id: product.id,
+          barcode: product.barcode,
+          name: product.name,
+          description: product.description,
+          line_id: product.line_id,
+          line_name: lineMap[product.line_id] || 'Sin línea',
+          category_id: product.category_id,
+          category: categoryMap[product.category_id] || 'Sin categoría',
+          brand_id: product.brand_id,
+          brand_name: brandMap[product.brand_id] || 'Sin marca',
+          size: product.size,
+          color: product.color,
+          purchase_price: product.purchase_price,
+          price: product.price,
+          min_stock: product.min_stock,
+          stock: stockMap[product.id] || 0,
+          active: product.active,
+          created_at: product.created_at,
+          updated_at: product.updated_at
+        };
+      });
+      
       // Aplicar filtros si se proporcionan
-      let filteredProducts = products;
+      let filteredProducts = enrichedProducts;
       
       if (payload && payload.category) {
         filteredProducts = filteredProducts.filter(function(p) {
-          return p.category === payload.category;
+          return p.category_id === payload.category;
         });
       }
       
@@ -1468,8 +1879,8 @@ function handleInvoiceAction(action, payload, userEmail) {
  * @param {Object} params - Parámetros de URL
  * @returns {HtmlOutput} Página HTML renderizada
  */
-function renderDashboard(userData, params) {
-  return renderBasePage(userData, 'dashboard');
+function renderDashboard(userData, params, sessionParams) {
+  return renderBasePage(userData, 'dashboard', sessionParams);
 }
 
 /**
@@ -1479,11 +1890,12 @@ function renderDashboard(userData, params) {
  * @param {string} pageName - Nombre de la página actual
  * @returns {HtmlOutput} Página HTML renderizada
  */
-function renderBasePage(userData, pageName) {
+function renderBasePage(userData, pageName, sessionParams) {
   try {
     Logger.log('=== renderBasePage ===');
     Logger.log('Page: ' + pageName);
     Logger.log('User: ' + userData.email);
+    Logger.log('SessionParams received: ' + JSON.stringify(sessionParams));
     
     // Cargar el template HTML desde gas/index.html
     const template = HtmlService.createTemplateFromFile('index');
@@ -1497,11 +1909,38 @@ function renderBasePage(userData, pageName) {
     // NUEVO: Pasar la URL correcta del script desplegado
     template.scriptUrl = ScriptApp.getService().getUrl();
     
+    // CRÍTICO: Pasar parámetros de sesión para preservarlos en la navegación
+    // Asegurarse de que siempre sean strings, nunca undefined o null
+    if (sessionParams && sessionParams.user && sessionParams.token) {
+      template.sessionUser = sessionParams.user;
+      template.sessionToken = sessionParams.token;
+      Logger.log('✅ Session params set: user=' + sessionParams.user);
+    } else {
+      template.sessionUser = '';
+      template.sessionToken = '';
+      Logger.log('⚠️ No session params provided');
+    }
+    
+    // CRÍTICO: Establecer variables globales para que include() pueda acceder a ellas
+    // Esto permite que los archivos incluidos (POS.html, ProductList.html, etc.) tengan acceso
+    PropertiesService.getScriptProperties().setProperties({
+      'CURRENT_USER_EMAIL': userData.email,
+      'CURRENT_USER_NAME': userData.name,
+      'CURRENT_SCRIPT_URL': template.scriptUrl,
+      'CURRENT_SESSION_USER': template.sessionUser,
+      'CURRENT_SESSION_TOKEN': template.sessionToken
+    });
+    
     Logger.log('Template variables set. Evaluating...');
     Logger.log('Script URL: ' + template.scriptUrl);
+    Logger.log('Session User: ' + template.sessionUser);
+    Logger.log('Session Token: ' + (template.sessionToken ? 'presente' : 'ausente'));
     
     // Evaluar el template
     const html = template.evaluate();
+    
+    // Limpiar propiedades después de evaluar
+    PropertiesService.getScriptProperties().deleteAllProperties();
     
     // Configurar propiedades de la página
     const pageTitle = getPageTitle(pageName);
@@ -1551,8 +1990,8 @@ function getPageTitle(pageName) {
  * 
  * Requisitos: 6.1, 6.3, 21.2
  */
-function renderPOS(userData, params) {
-  return renderBasePage(userData, 'pos');
+function renderPOS(userData, params, sessionParams) {
+  return renderBasePage(userData, 'pos', sessionParams);
 }
 
 /**
@@ -1560,106 +1999,106 @@ function renderPOS(userData, params) {
  * 
  * Requisitos: 6.2, 22.1, 22.2, 22.3, 22.4, 22.5
  */
-function renderBarcodeScanner(userData, params) {
-  return renderBasePage(userData, 'barcode-scanner');
+function renderBarcodeScanner(userData, params, sessionParams) {
+  return renderBasePage(userData, 'barcode-scanner', sessionParams);
 }
 
 /**
  * renderInventory - Renderiza la página de inventario
  */
-function renderInventory(userData, params) {
-  return renderBasePage(userData, 'inventory');
+function renderInventory(userData, params, sessionParams) {
+  return renderBasePage(userData, 'inventory', sessionParams);
 }
 
 /**
  * renderClients - Renderiza la página de clientes
  */
-function renderClients(userData, params) {
-  return renderBasePage(userData, 'clients');
+function renderClients(userData, params, sessionParams) {
+  return renderBasePage(userData, 'clients', sessionParams);
 }
 
 /**
  * renderProducts - Renderiza la página de productos
  */
-function renderProducts(userData, params) {
-  return renderBasePage(userData, 'products');
+function renderProducts(userData, params, sessionParams) {
+  return renderBasePage(userData, 'products', sessionParams);
 }
 
 /**
  * renderClientForm - Renderiza el formulario de cliente
  */
-function renderClientForm(userData, params) {
-  return renderBasePage(userData, 'cliente-form');
+function renderClientForm(userData, params, sessionParams) {
+  return renderBasePage(userData, 'cliente-form', sessionParams);
 }
 
 /**
  * renderCollections - Renderiza la página de cobranzas
  */
-function renderCollections(userData, params) {
-  return renderBasePage(userData, 'collections');
+function renderCollections(userData, params, sessionParams) {
+  return renderBasePage(userData, 'collections', sessionParams);
 }
 
 /**
  * renderCash - Renderiza la página de caja
  */
-function renderCash(userData, params) {
-  return renderBasePage(userData, 'cash');
+function renderCash(userData, params, sessionParams) {
+  return renderBasePage(userData, 'cash', sessionParams);
 }
 
 /**
  * renderReports - Renderiza la página de reportes
  */
-function renderReports(userData, params) {
-  return renderBasePage(userData, 'reports');
+function renderReports(userData, params, sessionParams) {
+  return renderBasePage(userData, 'reports', sessionParams);
 }
 
 /**
  * renderInvoices - Renderiza la página de facturas
  */
-function renderInvoices(userData, params) {
-  return renderBasePage(userData, 'invoices');
+function renderInvoices(userData, params, sessionParams) {
+  return renderBasePage(userData, 'invoices', sessionParams);
 }
 
 /**
  * renderSettings - Renderiza la página de configuración
  */
-function renderSettings(userData, params) {
-  return renderBasePage(userData, 'settings');
+function renderSettings(userData, params, sessionParams) {
+  return renderBasePage(userData, 'settings', sessionParams);
 }
 
 /**
  * renderStalledInventory - Renderiza la página de mercadería estancada
  */
-function renderStalledInventory(userData, params) {
-  return renderBasePage(userData, 'stalled-inventory');
+function renderStalledInventory(userData, params, sessionParams) {
+  return renderBasePage(userData, 'stalled-inventory', sessionParams);
 }
 
 /**
  * renderSuppliers - Renderiza la página de proveedores
  */
-function renderSuppliers(userData, params) {
-  return renderBasePage(userData, 'suppliers');
+function renderSuppliers(userData, params, sessionParams) {
+  return renderBasePage(userData, 'suppliers', sessionParams);
 }
 
 /**
  * renderPurchases - Renderiza la página de compras
  */
-function renderPurchases(userData, params) {
-  return renderBasePage(userData, 'purchases');
+function renderPurchases(userData, params, sessionParams) {
+  return renderBasePage(userData, 'purchases', sessionParams);
 }
 
 /**
  * renderProductForm - Renderiza el formulario de producto
  */
-function renderProductForm(userData, params) {
-  return renderBasePage(userData, 'producto-form');
+function renderProductForm(userData, params, sessionParams) {
+  return renderBasePage(userData, 'producto-form', sessionParams);
 }
 
 /**
  * renderBulkProductEntry - Renderiza el formulario de ingreso masivo
  */
-function renderBulkProductEntry(userData, params) {
-  return renderBasePage(userData, 'bulk-entry');
+function renderBulkProductEntry(userData, params, sessionParams) {
+  return renderBasePage(userData, 'bulk-entry', sessionParams);
 }
 
 
@@ -1685,61 +2124,70 @@ function renderManualLogin(attemptedEmail, errorMessage) {
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.min.css">
       <style>
         body {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: #f8fafc;
           min-height: 100vh;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
         .login-container {
           background-color: white;
           padding: 3rem;
-          border-radius: 15px;
-          box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+          border-radius: 20px;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.15);
           max-width: 500px;
           width: 100%;
         }
         .icon-container {
           text-align: center;
           font-size: 4rem;
-          color: #667eea;
+          color: #2563eb;
           margin-bottom: 1.5rem;
         }
         h1 {
-          color: #333;
+          color: #1e293b;
           margin-bottom: 1rem;
           font-size: 1.8rem;
           text-align: center;
+          font-weight: 600;
         }
         .form-control {
           padding: 0.75rem;
           font-size: 1rem;
-          border-radius: 8px;
+          border-radius: 10px;
+          border: 2px solid #e2e8f0;
+        }
+        .form-control:focus {
+          border-color: #2563eb;
+          box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
         }
         .btn-primary {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
           border: none;
           padding: 0.75rem 2rem;
           font-size: 1rem;
-          border-radius: 8px;
+          border-radius: 10px;
           width: 100%;
+          font-weight: 600;
+          transition: transform 0.2s, box-shadow 0.2s;
         }
         .btn-primary:hover {
-          background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+          transform: translateY(-2px);
+          box-shadow: 0 10px 20px rgba(37, 99, 235, 0.3);
         }
         .alert-custom {
-          background-color: #f8d7da;
-          border-left: 4px solid #dc3545;
+          background-color: #fee2e2;
+          border-left: 4px solid #dc2626;
           padding: 1rem;
-          border-radius: 4px;
+          border-radius: 10px;
           margin-bottom: 1.5rem;
         }
         .info-box {
-          background-color: #d1ecf1;
-          border-left: 4px solid #17a2b8;
+          background-color: #dbeafe;
+          border-left: 4px solid #2563eb;
           padding: 1rem;
-          border-radius: 4px;
+          border-radius: 10px;
           margin-top: 1.5rem;
           font-size: 0.9rem;
         }
@@ -1867,48 +2315,49 @@ function renderAccessDenied(userEmail) {
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.min.css">
       <style>
         body {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: #f8fafc;
           min-height: 100vh;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
         .access-denied-container {
           background-color: white;
           padding: 3rem;
-          border-radius: 15px;
-          box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+          border-radius: 20px;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.15);
           max-width: 500px;
           text-align: center;
         }
         .icon-container {
           font-size: 5rem;
-          color: #dc3545;
+          color: #dc2626;
           margin-bottom: 1.5rem;
         }
         h1 {
-          color: #333;
+          color: #1e293b;
           margin-bottom: 1rem;
           font-size: 1.8rem;
+          font-weight: 600;
         }
         .user-info {
-          background-color: #f8f9fa;
+          background-color: #f1f5f9;
           padding: 1rem;
-          border-radius: 8px;
+          border-radius: 10px;
           margin: 1.5rem 0;
           font-size: 0.9rem;
         }
         .alert-custom {
-          background-color: #fff3cd;
-          border-left: 4px solid #ffc107;
+          background-color: #fef3c7;
+          border-left: 4px solid #f59e0b;
           padding: 1rem;
-          border-radius: 4px;
+          border-radius: 10px;
           text-align: left;
           margin-top: 1.5rem;
         }
         .alert-custom strong {
-          color: #856404;
+          color: #92400e;
         }
       </style>
     </head>
@@ -1971,34 +2420,44 @@ function renderLogout(userEmail) {
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.min.css">
       <style>
         body {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: #f8fafc;
           min-height: 100vh;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
         .logout-container {
           background-color: white;
           padding: 3rem;
-          border-radius: 15px;
-          box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+          border-radius: 20px;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.15);
           max-width: 500px;
           text-align: center;
         }
         .icon-container {
           font-size: 5rem;
-          color: #28a745;
+          color: #10b981;
           margin-bottom: 1.5rem;
         }
         h1 {
-          color: #333;
+          color: #1e293b;
           margin-bottom: 1rem;
           font-size: 1.8rem;
+          font-weight: 600;
         }
         .btn-primary {
           margin-top: 1.5rem;
           padding: 0.75rem 2rem;
+          background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+          border: none;
+          border-radius: 10px;
+          font-weight: 600;
+          transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn-primary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 10px 20px rgba(37, 99, 235, 0.3);
         }
       </style>
     </head>
@@ -2432,23 +2891,80 @@ function searchProducts(query) {
     }
     
     const productRepo = new ProductRepository();
+    const stockRepo = new StockRepository();
+    const categoryRepo = new CategoryRepository();
+    const lineRepo = new LineRepository();
+    const brandRepo = new BrandRepository();
     
     // Intentar buscar por código de barras primero
     const productByBarcode = productRepo.findByBarcode(query);
     
+    let products = [];
+    
     if (productByBarcode) {
-      return {
-        success: true,
-        data: [productByBarcode]
-      };
+      products = [productByBarcode];
+    } else {
+      // Si no se encuentra por código, buscar por nombre
+      products = productRepo.search(query);
     }
     
-    // Si no se encuentra por código, buscar por nombre
-    const products = productRepo.search(query);
+    // Obtener todas las categorías, líneas y marcas para hacer JOIN
+    const allCategories = categoryRepo.findAll();
+    const allLines = lineRepo.findAll();
+    const allBrands = brandRepo.findAll();
+    
+    // Crear mapas para búsqueda rápida
+    const categoryMap = {};
+    for (let i = 0; i < allCategories.length; i++) {
+      const cat = allCategories[i];
+      categoryMap[cat.id] = cat;
+    }
+    
+    const lineMap = {};
+    for (let i = 0; i < allLines.length; i++) {
+      const line = allLines[i];
+      lineMap[line.id] = line;
+    }
+    
+    const brandMap = {};
+    for (let i = 0; i < allBrands.length; i++) {
+      const brand = allBrands[i];
+      brandMap[brand.id] = brand;
+    }
+    
+    // CRÍTICO: Agregar información de stock para cada producto
+    // Asumimos almacén de mujeres por defecto
+    // TODO: Obtener el almacén del usuario actual
+    const warehouseId = 'Mujeres';
+    
+    const productsWithStock = [];
+    for (let i = 0; i < products.length; i++) {
+      const product = products[i];
+      
+      // Buscar stock del producto en el almacén
+      const stockRecord = stockRepo.findByWarehouseAndProduct(warehouseId, product.id);
+      
+      // Agregar campo stock al producto
+      product.stock = stockRecord ? (Number(stockRecord.quantity) || 0) : 0;
+      
+      // Enriquecer con nombres de categoría, línea y marca
+      const category = categoryMap[product.category_id];
+      product.category = category ? category.name : 'Sin categoría';
+      
+      const line = lineMap[product.line_id];
+      product.line_name = line ? line.name : '';
+      
+      const brand = brandMap[product.brand_id];
+      product.brand_name = brand ? brand.name : '';
+      
+      // La talla ya viene en product.size (es un campo directo, no FK)
+      
+      productsWithStock.push(product);
+    }
     
     return {
       success: true,
-      data: products
+      data: productsWithStock
     };
     
   } catch (error) {
@@ -2539,6 +3055,7 @@ function getInventoryReport(warehouseId) {
     
     const stockRepo = new StockRepository();
     const productRepo = new ProductRepository();
+    const categoryRepo = new CategoryRepository();
     
     // Obtener todos los registros de stock
     let stockRecords = stockRepo.findAll();
@@ -2548,6 +3065,14 @@ function getInventoryReport(warehouseId) {
       stockRecords = stockRecords.filter(function(record) {
         return record.warehouse_id === warehouseId;
       });
+    }
+    
+    // Obtener todas las categorías para hacer JOIN
+    const allCategories = categoryRepo.findAll();
+    const categoryMap = {};
+    for (let i = 0; i < allCategories.length; i++) {
+      const cat = allCategories[i];
+      categoryMap[cat.id] = cat;
     }
     
     // Construir reporte
@@ -2566,6 +3091,10 @@ function getInventoryReport(warehouseId) {
         continue;
       }
       
+      // Obtener nombre de categoría desde el mapa
+      const category = categoryMap[product.category_id];
+      const categoryName = category ? category.name : 'Sin categoría';
+      
       const quantity = parseFloat(stockRecord.quantity) || 0;
       const price = parseFloat(product.price) || 0;
       const value = quantity * price;
@@ -2581,7 +3110,7 @@ function getInventoryReport(warehouseId) {
       inventory.push({
         productId: product.id,
         productName: product.name,
-        category: product.category || '',
+        category: categoryName,
         quantity: quantity,
         price: price,
         value: value,
@@ -2645,21 +3174,77 @@ function getDashboardData() {
       const allSales = saleRepo.findAll();
       Logger.log('Total de ventas en BD: ' + allSales.length);
       
+      // DEBUG: Mostrar primeras 3 ventas para diagnóstico
+      if (allSales.length > 0) {
+        Logger.log('=== DIAGNÓSTICO DE VENTAS ===');
+        for (let i = 0; i < Math.min(3, allSales.length); i++) {
+          const sale = allSales[i];
+          Logger.log('Venta ' + (i+1) + ':');
+          Logger.log('  - id: ' + sale.id);
+          Logger.log('  - created_at: ' + sale.created_at + ' (tipo: ' + typeof sale.created_at + ')');
+          Logger.log('  - voided: ' + sale.voided);
+          Logger.log('  - client_id: ' + sale.client_id);
+          Logger.log('  - total: ' + sale.total);
+        }
+        Logger.log('=== FIN DIAGNÓSTICO ===');
+      }
+      
+      // Obtener clientes para enriquecer datos
+      const clientRepo = new ClientRepository();
+      const allClients = clientRepo.findAll();
+      
+      // Crear mapa de clientes por ID para búsqueda rápida
+      const clientMap = {};
+      for (let i = 0; i < allClients.length; i++) {
+        const client = allClients[i];
+        clientMap[client.id] = client;
+      }
+      
       let salesTodayTotal = 0;
       const recentSales = [];
+      let skippedCount = 0;
+      let skippedReasons = {
+        noId: 0,
+        voided: 0,
+        noDate: 0,
+        invalidDate: 0
+      };
       
       for (let i = 0; i < allSales.length; i++) {
         const sale = allSales[i];
         
-        // Saltar ventas sin datos válidos
-        if (!sale.id || !sale.date) {
+        // Saltar ventas sin ID
+        if (!sale.id) {
+          skippedCount++;
+          skippedReasons.noId++;
           continue;
         }
         
-        // Convertir fecha si es necesario
-        let saleDate = sale.date;
+        // Saltar ventas anuladas
+        if (sale.voided === true || sale.voided === 'TRUE' || sale.voided === 'true') {
+          skippedCount++;
+          skippedReasons.voided++;
+          continue;
+        }
+        
+        // Convertir fecha si es necesario - usar created_at
+        let saleDate = sale.created_at;
+        
+        if (!saleDate) {
+          skippedCount++;
+          skippedReasons.noDate++;
+          continue;
+        }
+        
         if (typeof saleDate === 'string') {
           saleDate = new Date(saleDate);
+        }
+        
+        // Si no hay fecha válida, saltar
+        if (!(saleDate instanceof Date) || isNaN(saleDate.getTime())) {
+          skippedCount++;
+          skippedReasons.invalidDate++;
+          continue;
         }
         
         // Verificar si es de hoy
@@ -2669,13 +3254,17 @@ function getDashboardData() {
         
         // Agregar a ventas recientes (últimas 10 con datos válidos)
         if (recentSales.length < 10) {
+          // Obtener nombre del cliente
+          const client = clientMap[sale.client_id];
+          const clientName = client ? client.name : 'Cliente General';
+          
           recentSales.push({
             id: sale.id,
-            date: saleDate instanceof Date ? saleDate.toISOString().split('T')[0] : saleDate,
-            client: sale.client_name || 'Cliente General',
+            date: saleDate.toISOString().split('T')[0],
+            client: clientName,
             type: sale.sale_type || 'CONTADO',
             total: parseFloat(sale.total) || 0,
-            status: sale.status || 'COMPLETED'
+            status: sale.payment_status || 'COMPLETED'
           });
         }
       }
@@ -2685,8 +3274,11 @@ function getDashboardData() {
       
       Logger.log('Ventas hoy: S/ ' + salesTodayTotal);
       Logger.log('Ventas recientes válidas: ' + recentSales.length);
+      Logger.log('Ventas saltadas: ' + skippedCount);
+      Logger.log('Razones: ' + JSON.stringify(skippedReasons));
     } catch (e) {
       Logger.log('Error al obtener ventas de hoy: ' + e.message);
+      Logger.log('Stack trace: ' + e.stack);
       // Continuar con valores por defecto
     }
     
@@ -3054,6 +3646,55 @@ function getClients() {
   });
 }
 
+/**
+ * createClientQuick - Crea un cliente rápido desde POS
+ * 
+ * @param {Object} clientData - Datos del cliente
+ * @returns {Object} Respuesta con cliente creado
+ */
+function createClientQuick(clientData) {
+  return wrapResponse(function() {
+    // Validar datos requeridos
+    if (!clientData.name || !clientData.dni || !clientData.phone) {
+      throw new Error('Faltan datos requeridos: nombre, DNI y teléfono');
+    }
+    
+    // Validar formato de DNI
+    if (!/^[0-9]{8}$/.test(clientData.dni)) {
+      throw new Error('El DNI debe tener 8 dígitos');
+    }
+    
+    // Verificar si ya existe un cliente con ese DNI
+    const clientRepo = new ClientRepository();
+    const existingClient = clientRepo.findByDNI(clientData.dni);
+    
+    if (existingClient) {
+      throw new Error('Ya existe un cliente con el DNI ' + clientData.dni);
+    }
+    
+    // Crear cliente
+    const newClient = {
+      id: 'cli-' + new Date().getTime() + '-' + Math.random().toString(36).substr(2, 9),
+      name: clientData.name,
+      dni: clientData.dni,
+      phone: clientData.phone,
+      email: clientData.email || '',
+      address: clientData.address || '',
+      birthday: clientData.birthday || '',
+      active: true,
+      created_at: new Date(),
+      credit_limit: 0,
+      notes: 'Cliente creado desde POS'
+    };
+    
+    const createdClient = clientRepo.create(newClient);
+    
+    Logger.log('Cliente creado rápidamente: ' + newClient.id);
+    
+    return createdClient;
+  });
+}
+
 
 /**
  * generateTicket - Genera y retorna el ticket de venta
@@ -3110,9 +3751,27 @@ function include(filename) {
   try {
     Logger.log('Intentando incluir archivo: ' + filename);
     
+    // CRÍTICO: Obtener variables globales establecidas por renderBasePage
+    const props = PropertiesService.getScriptProperties();
+    const userEmail = props.getProperty('CURRENT_USER_EMAIL') || '';
+    const userName = props.getProperty('CURRENT_USER_NAME') || '';
+    const scriptUrl = props.getProperty('CURRENT_SCRIPT_URL') || '';
+    const sessionUser = props.getProperty('CURRENT_SESSION_USER') || '';
+    const sessionToken = props.getProperty('CURRENT_SESSION_TOKEN') || '';
+    
+    Logger.log('Include variables: userEmail=' + userEmail + ', scriptUrl=' + scriptUrl);
+    
     // CRÍTICO: Usar createTemplateFromFile para evaluar variables del servidor
     // Esto permite que <?= scriptUrl ?> y otras variables funcionen en archivos incluidos
     const template = HtmlService.createTemplateFromFile(filename);
+    
+    // Pasar variables al template incluido
+    template.userEmail = userEmail;
+    template.userName = userName;
+    template.scriptUrl = scriptUrl;
+    template.sessionUser = sessionUser;
+    template.sessionToken = sessionToken;
+    
     let content = template.evaluate().getContent();
     
     // Extraer solo el contenido del body para evitar conflictos

@@ -145,9 +145,19 @@ const PERMISSIONS = {
 };
 
 /**
- * Tiendas disponibles
+ * Tiendas y Almacenes disponibles
+ * IMPORTANTE: Los valores deben coincidir EXACTAMENTE con los valores en INV_Stock.warehouse_id
  */
 const STORES = {
+  MUJERES: 'Mujeres',
+  HOMBRES: 'Hombres'
+};
+
+/**
+ * IDs de almacenes (warehouse_id en INV_Stock)
+ * IMPORTANTE: Estos valores deben coincidir con los datos reales en la hoja INV_Stock
+ */
+const WAREHOUSES = {
   MUJERES: 'Mujeres',
   HOMBRES: 'Hombres'
 };

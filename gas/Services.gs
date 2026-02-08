@@ -1663,7 +1663,7 @@ class POSService {
         
         // Obtener el almacén de la venta (asumiendo que está en el contexto)
         // TODO: Obtener warehouseId desde la venta cuando esté disponible
-        const warehouseId = 'WH_MUJERES'; // Por ahora usar default
+        const warehouseId = 'Mujeres'; // Por ahora usar default
         
         this.inventoryService.releaseStock(
           warehouseId,

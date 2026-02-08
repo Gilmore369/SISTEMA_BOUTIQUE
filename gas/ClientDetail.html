@@ -61,7 +61,7 @@
         <button type="button" class="btn btn-outline-primary" onclick="editClient()">
           <i class="bi bi-pencil"></i> Editar
         </button>
-        <button type="button" class="btn btn-outline-secondary" onclick="window.location.href='?page=clientes'">
+        <button type="button" class="btn btn-outline-secondary" onclick="if(window.parent.navigateTo){window.parent.navigateTo('clientes')}else{window.location.href='?page=clientes&user=<?= sessionUser ?>&token=<?= sessionToken ?>'}">
           <i class="bi bi-arrow-left"></i> Volver
         </button>
       </div>
@@ -269,7 +269,11 @@
       if (!clientId) {
         showAlert('danger', 'ID de cliente no especificado');
         setTimeout(function() {
-          window.location.href = '?page=clientes';
+          if (window.parent && window.parent.navigateTo) {
+            window.parent.navigateTo('clientes');
+          } else {
+            window.location.href = '?page=clientes&user=<?= sessionUser ?>&token=<?= sessionToken ?>';
+          }
         }, 2000);
         return;
       }
@@ -607,29 +611,46 @@
      * Edit client
      */
     function editClient() {
-      window.location.href = '?page=cliente-form&id=' + clientId;
+      if (window.parent && window.parent.buildUrlWithSession) {
+        window.location.href = window.parent.buildUrlWithSession('cliente-form', {id: clientId});
+      } else {
+        window.location.href = '?page=cliente-form&id=' + clientId + '&user=<?= sessionUser ?>&token=<?= sessionToken ?>';
+      }
     }
     
     /**
      * View sale details
      */
     function viewSale(saleId) {
-      window.location.href = '?page=venta-detalle&id=' + saleId;
+      if (window.parent && window.parent.buildUrlWithSession) {
+        window.location.href = window.parent.buildUrlWithSession('venta-detalle', {id: saleId});
+      } else {
+        window.location.href = '?page=venta-detalle&id=' + saleId + '&user=<?= sessionUser ?>&token=<?= sessionToken ?>';
+      }
     }
     
     /**
      * Print receipt
      */
     function printReceipt(paymentId) {
+      // CRÍTICO: Construir URL con parámetros de sesión
+      const sessionUser = '<?= sessionUser ?>';
+      const sessionToken = '<?= sessionToken ?>';
+      const receiptUrl = '?page=recibo&id=' + paymentId + '&user=' + encodeURIComponent(sessionUser) + '&token=' + encodeURIComponent(sessionToken);
+      
       // Open receipt in new window for printing
-      window.open('?page=recibo&id=' + paymentId, '_blank');
+      window.open(receiptUrl, '_blank');
     }
     
     /**
      * Register payment for installment
      */
     function registerPayment(installmentId) {
-      window.location.href = '?page=cobranzas&installment=' + installmentId;
+      if (window.parent && window.parent.buildUrlWithSession) {
+        window.location.href = window.parent.buildUrlWithSession('cobranzas', {installment: installmentId});
+      } else {
+        window.location.href = '?page=cobranzas&installment=' + installmentId + '&user=<?= sessionUser ?>&token=<?= sessionToken ?>';
+      }
     }
     
     /**

@@ -249,7 +249,9 @@
         window.close();
       } else {
         // If not popup, redirect to POS with barcode
-        window.location.href = '?page=pos&barcode=' + detectedBarcode;
+        const sessionUser = '<?= sessionUser ?>';
+        const sessionToken = '<?= sessionToken ?>';
+        window.location.href = '?page=pos&barcode=' + detectedBarcode + '&user=' + encodeURIComponent(sessionUser) + '&token=' + encodeURIComponent(sessionToken);
       }
     }
     
@@ -271,7 +273,9 @@
       if (window.opener) {
         window.close();
       } else {
-        window.location.href = '?page=pos';
+        const sessionUser = '<?= sessionUser ?>';
+        const sessionToken = '<?= sessionToken ?>';
+        window.location.href = '?page=pos&user=' + encodeURIComponent(sessionUser) + '&token=' + encodeURIComponent(sessionToken);
       }
     }
     
