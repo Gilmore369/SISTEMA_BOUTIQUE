@@ -416,20 +416,50 @@ function doPost(e) {
         // Generar token
         const token = generateToken(username);
         
-        // Redirigir al dashboard
+        // Construir URL de redirección con parámetros de sesión
         const scriptUrl = ScriptApp.getService().getUrl();
-        const redirectUrl = scriptUrl + '?user=' + encodeURIComponent(username) + 
-                           '&token=' + encodeURIComponent(token);
+        const redirectUrl = scriptUrl + '?user=' + encodeURIComponent(username) + '&token=' + encodeURIComponent(token) + '&page=dashboard';
         
-        // HTML con redirección usando window.top para salir del iframe
-        const html = '<html><body>' +
+        Logger.log('Redirigiendo a: ' + redirectUrl);
+        
+        // CRÍTICO: Usar window.top.location.href para salir del iframe
+        // Esto funciona en modo incógnito porque fuerza la navegación en la ventana superior
+        const html = '<!DOCTYPE html>' +
+          '<html lang="es">' +
+          '<head>' +
+          '<meta charset="utf-8">' +
+          '<title>Iniciando sesión...</title>' +
+          '<style>' +
+          'body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }' +
+          '.spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid white; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }' +
+          '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }' +
+          '</style>' +
+          '</head>' +
+          '<body>' +
+          '<h2>✅ Login exitoso</h2>' +
+          '<div class="spinner"></div>' +
           '<p>Iniciando sesión, por favor espere...</p>' +
-          '<script>window.top.location.href = "' + redirectUrl + '";</script>' +
-          '<noscript><meta http-equiv="refresh" content="0;url=' + redirectUrl + '"></noscript>' +
-          '<p>Si no es redirigido automáticamente, <a href="' + redirectUrl + '" target="_top">haga clic aquí</a>.</p>' +
-          '</body></html>';
+          '<script>' +
+          'try {' +
+          '  if (window.top && window.top.location) {' +
+          '    window.top.location.href = "' + redirectUrl + '";' +
+          '  } else {' +
+          '    window.location.href = "' + redirectUrl + '";' +
+          '  }' +
+          '} catch(e) {' +
+          '  console.error("Error en redirección:", e);' +
+          '  window.location.href = "' + redirectUrl + '";' +
+          '}' +
+          '</script>' +
+          '<noscript>' +
+          '<meta http-equiv="refresh" content="0;url=' + redirectUrl + '">' +
+          '</noscript>' +
+          '<p><a href="' + redirectUrl + '" target="_top" style="color: white; text-decoration: underline;">Si no es redirigido automáticamente, haga clic aquí</a></p>' +
+          '</body>' +
+          '</html>';
         
         return HtmlService.createHtmlOutput(html)
+          .setTitle('Iniciando sesión...')
           .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
       } else {
         Logger.log('❌ Login fallido para: ' + username);
