@@ -452,41 +452,63 @@
     console.log('Window location:', window.location.href);
     console.log('User data:', USER_DATA);
     
-    // Navigation function - CORREGIDA para usar SCRIPT_URL del servidor
+    // Navigation function - REFACTORIZADA para ser más robusta
     // GLOBAL para que los módulos incluidos puedan acceder
     window.navigateTo = function(page, params) {
-      const urlParams = new URLSearchParams(window.location.search);
-      
-      // CRÍTICO: Preservar parámetros de sesión (usuario/contraseña O email)
-      const sessionUser = urlParams.get('user');
-      const sessionToken = urlParams.get('token');
-      const sessionEmail = urlParams.get('sessionEmail');
-      
-      let newUrl = window.SCRIPT_URL + '?page=' + page;
-      
-      // Preservar sesión de usuario/contraseña si existe
-      if (sessionUser && sessionToken) {
-        newUrl += '&user=' + encodeURIComponent(sessionUser);
-        newUrl += '&token=' + encodeURIComponent(sessionToken);
-      }
-      // O preservar sessionEmail si existe (fallback)
-      else if (sessionEmail) {
-        newUrl += '&sessionEmail=' + encodeURIComponent(sessionEmail);
-      }
-      
-      // Agregar parámetros adicionales si existen
-      if (params) {
-        for (const key in params) {
-          if (params.hasOwnProperty(key)) {
-            newUrl += '&' + key + '=' + encodeURIComponent(params[key]);
+      try {
+        // Obtener parámetros actuales de forma robusta
+        let urlParams;
+        try {
+          urlParams = new URLSearchParams(window.location.search);
+        } catch(e) {
+          console.error('Error al parsear URLSearchParams:', e);
+          urlParams = new URLSearchParams();
+        }
+        
+        // CRÍTICO: Preservar parámetros de sesión (usuario/contraseña O email)
+        const sessionUser = urlParams.get('user');
+        const sessionToken = urlParams.get('token');
+        const sessionEmail = urlParams.get('sessionEmail');
+        
+        // Construir nueva URL
+        let newUrl = window.SCRIPT_URL + '?page=' + encodeURIComponent(page);
+        
+        // Preservar sesión de usuario/contraseña si existe
+        if (sessionUser && sessionToken) {
+          newUrl += '&user=' + encodeURIComponent(sessionUser);
+          newUrl += '&token=' + encodeURIComponent(sessionToken);
+        }
+        // O preservar sessionEmail si existe (fallback)
+        else if (sessionEmail) {
+          newUrl += '&sessionEmail=' + encodeURIComponent(sessionEmail);
+        }
+        
+        // Agregar parámetros adicionales si existen
+        if (params) {
+          for (const key in params) {
+            if (params.hasOwnProperty(key)) {
+              newUrl += '&' + encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
+            }
           }
         }
+        
+        console.log('Navegando a:', newUrl);
+        
+        // Redirección robusta usando window.top para salir del iframe
+        try {
+          if (window.top && window.top.location) {
+            window.top.location.href = newUrl;
+          } else {
+            window.location.href = newUrl;
+          }
+        } catch(e) {
+          console.error('Error en redirección:', e);
+          window.location.href = newUrl;
+        }
+      } catch(error) {
+        console.error('Error en navigateTo:', error);
+        alert('Error al navegar. Por favor, recarga la página.');
       }
-      
-      console.log('Navegando a:', newUrl);
-      
-      // Redirección usando la URL correcta del servidor
-      window.top.location.href = newUrl;
     };
     
     // Alias local para compatibilidad
@@ -518,10 +540,29 @@
       
       console.log('Cargando datos del dashboard...');
       
-      // Usar google.script.run en lugar de AJAX para evitar problemas de CORS
-      google.script.run
-        .withSuccessHandler(function(response) {
+      // Usar AJAX POST en lugar de google.script.run para evitar problemas con null
+      $.ajax({
+        url: window.SCRIPT_URL,
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+          action: 'getDashboardData',
+          payload: {
+            userEmail: window.USER_DATA.email
+          }
+        }),
+        success: function(response) {
           console.log('Dashboard data recibida:', response);
+          
+          // Parsear respuesta si es string
+          if (typeof response === 'string') {
+            try {
+              response = JSON.parse(response);
+            } catch(e) {
+              console.error('Error al parsear respuesta:', e);
+              return;
+            }
+          }
           
           // Validar que response no sea null
           if (!response) {
@@ -570,12 +611,13 @@
           } else {
             console.error('Error en respuesta del dashboard:', response.error);
           }
-        })
-        .withFailureHandler(function(error) {
+        },
+        error: function(xhr, status, error) {
           console.error('Error al cargar dashboard:', error);
-          console.error('Error message:', error.message);
-        })
-        .getDashboardData();
+          console.error('Status:', status);
+          console.error('Response:', xhr.responseText);
+        }
+      });
     }
     
     // Actualizar tabla de ventas recientes

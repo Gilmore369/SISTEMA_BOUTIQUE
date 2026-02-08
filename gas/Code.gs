@@ -416,13 +416,18 @@ function doPost(e) {
         // Generar token
         const token = generateToken(username);
         
-        // Redirigir al dashboard usando doGet con parámetros
+        // Redirigir al dashboard
         const scriptUrl = ScriptApp.getService().getUrl();
         const redirectUrl = scriptUrl + '?user=' + encodeURIComponent(username) + 
                            '&token=' + encodeURIComponent(token);
         
-        // Retornar HTML que hace redirect inmediato
-        const html = '<html><head><meta http-equiv="refresh" content="0;url=' + redirectUrl + '"></head><body>Redirigiendo...</body></html>';
+        // HTML con redirección usando window.top para salir del iframe
+        const html = '<html><body>' +
+          '<p>Iniciando sesión, por favor espere...</p>' +
+          '<script>window.top.location.href = "' + redirectUrl + '";</script>' +
+          '<noscript><meta http-equiv="refresh" content="0;url=' + redirectUrl + '"></noscript>' +
+          '<p>Si no es redirigido automáticamente, <a href="' + redirectUrl + '" target="_top">haga clic aquí</a>.</p>' +
+          '</body></html>';
         
         return HtmlService.createHtmlOutput(html)
           .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);

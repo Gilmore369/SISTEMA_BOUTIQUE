@@ -2,7 +2,11 @@
 
 ## ✅ ESTADO: LISTO PARA DESPLEGAR
 
-El código está corregido y funcional. Solo sigue estos pasos:
+El código está corregido con las siguientes mejoras:
+- ✅ Redirección robusta con `window.top.location.href` (funciona en incógnito)
+- ✅ Navegación refactorizada con manejo de errores
+- ✅ Dashboard usa AJAX POST en lugar de `google.script.run` (evita null)
+- ✅ Variables globales `USER_DATA` y `SCRIPT_URL` definidas correctamente
 
 ## 📋 PASOS PARA DESPLEGAR
 
@@ -14,7 +18,7 @@ Ve a https://script.google.com y abre tu proyecto
 2. Selecciona **"Nueva implementación"**
 3. Click en el engranaje ⚙️ → **"Aplicación web"**
 4. Configura:
-   - Descripción: `Login v3`
+   - Descripción: `Login v4 - Incógnito Fix`
    - Ejecutar como: `Yo`
    - Quién tiene acceso: `Cualquier persona`
 5. Click en **"Implementar"**
@@ -28,7 +32,8 @@ Ve a https://script.google.com y abre tu proyecto
    Contraseña: admin123
    ```
 3. Click en "Iniciar Sesión"
-4. Deberías ver el dashboard
+4. Deberías ver "Redirigiendo..." y luego el dashboard
+5. Si no redirige automáticamente, click en "Haz clic aquí"
 
 ## 👥 USUARIOS DISPONIBLES
 
@@ -38,18 +43,37 @@ gian / gian123
 vendedor / vendedor123
 ```
 
-## 🔧 CAMBIOS REALIZADOS
+## 🔧 CAMBIOS TÉCNICOS APLICADOS
 
-- ✅ Eliminé template literals problemáticos
-- ✅ Corregí la generación de HTML
-- ✅ Corregí la redirección después del login
-- ✅ Corregí BulkProductEntry.html
-- ✅ Eliminé archivos innecesarios (Code_EMERGENCY, Code_SIMPLE)
+### 1. Redirección Robusta (Code.gs - doPost)
+- Usa `window.top.location.href` para salir del iframe
+- Incluye enlace de respaldo con `target="_top"`
+- Manejo de errores con try-catch
+
+### 2. Navegación Refactorizada (index.html)
+- `window.navigateTo` más robusta con try-catch
+- Captura de URLSearchParams con manejo de errores
+- Preservación correcta de parámetros de sesión
+- Redirección con `window.top.location.href`
+
+### 3. Dashboard con AJAX (index.html)
+- Cambio de `google.script.run` a `$.ajax POST`
+- Envía `userEmail` explícitamente en el body
+- Evita el problema de respuesta `null`
+- Mejor manejo de errores
+
+### 4. Variables Globales (index.html)
+- `window.USER_DATA` definida al inicio
+- `window.SCRIPT_URL` definida al inicio
+- Disponibles para todos los módulos incluidos
 
 ## 🆘 SI NO FUNCIONA
 
 ### Error: "Redirigiendo..." se queda cargando
-**Solución:** Click en el enlace "haz click aquí" que aparece debajo
+**Solución:** Click en el enlace "Haz clic aquí" que aparece debajo
+
+### Error: Dashboard no carga datos
+**Solución:** Abre F12 → Console y verifica errores. El dashboard ahora usa AJAX POST.
 
 ### Otros errores
 Envíame:
@@ -61,4 +85,5 @@ Envíame:
 ---
 
 **Última actualización:** Ahora
-**Versión:** 3.0 Final
+**Versión:** 4.0 - Incógnito Fix
+**Cambios:** Redirección robusta + AJAX POST + Navegación refactorizada
