@@ -219,6 +219,11 @@ class BaseRepository {
 - `ShiftRepository`: CASH_Shifts
 - `ExpenseRepository`: CASH_Expenses
 - `AuditRepository`: AUD_Log
+- `LineRepository`: CAT_Lines
+- `CategoryRepository`: CAT_Categories
+- `BrandRepository`: CAT_Brands
+- `SizeRepository`: CAT_Sizes
+- `SupplierRepository`: CAT_Suppliers
 
 #### 4. Utilities
 
@@ -341,6 +346,118 @@ class CacheManager {
 }
 ```
 
+**ResponseNormalizer.gs**: Normalización de respuestas
+```javascript
+class ResponseNormalizer {
+  static safeResponse(data) {
+    if (data === null || data === undefined) {
+      return null;
+    }
+    
+    if (data instanceof Date) {
+      return data.toISOString();
+    }
+    
+    if (Array.isArray(data)) {
+      return data.map(item => this.safeResponse(item));
+    }
+    
+    if (typeof data === 'object') {
+      const normalized = {};
+      for (const key in data) {
+        if (data.hasOwnProperty(key)) {
+          normalized[key] = this.safeResponse(data[key]);
+        }
+      }
+      return normalized;
+    }
+    
+    return data;
+  }
+  
+  static wrapResponse(fn) {
+    try {
+      const result = fn();
+      return {
+        success: true,
+        data: this.safeResponse(result)
+      };
+    } catch (e) {
+      Logger.log('Error in wrapped function: ' + e.message);
+      return {
+        success: false,
+        error: e.message || 'Error desconocido'
+      };
+    }
+  }
+}
+```
+
+**BulkProductService.gs**: Ingreso masivo de productos
+```javascript
+class BulkProductService {
+  constructor() {
+    this.productRepo = new ProductRepository();
+    this.sizeRepo = new SizeRepository();
+  }
+  
+  createBulkProducts(baseProduct, sizeDistribution, purchasePrice) {
+    // Parsear distribución: "2S, 3M, 4L" -> [{size: 'S', qty: 2}, ...]
+    const distribution = this._parseSizeDistribution(sizeDistribution);
+    
+    // Validar que las tallas existen
+    const validSizes = this.sizeRepo.findAll().map(s => s.code);
+    for (const item of distribution) {
+      if (!validSizes.includes(item.size)) {
+        throw new Error('Talla no válida: ' + item.size);
+      }
+    }
+    
+    const createdProducts = [];
+    const entryDate = new Date();
+    
+    for (const item of distribution) {
+      for (let i = 0; i < item.quantity; i++) {
+        const variant = {
+          ...baseProduct,
+          size: item.size,
+          barcode: this._generateBarcode(baseProduct, item.size, i),
+          purchase_price: purchasePrice,
+          entry_date: entryDate,
+          id: Utilities.getUuid()
+        };
+        
+        const created = this.productRepo.create(variant);
+        createdProducts.push(created);
+      }
+    }
+    
+    return createdProducts;
+  }
+  
+  _parseSizeDistribution(distribution) {
+    // "2S, 3M, 4L" -> [{size: 'S', quantity: 2}, ...]
+    const parts = distribution.split(',').map(s => s.trim());
+    return parts.map(part => {
+      const match = part.match(/^(\d+)([A-Z]+)$/);
+      if (!match) {
+        throw new Error('Formato de distribución inválido: ' + part);
+      }
+      return {
+        quantity: parseInt(match[1]),
+        size: match[2]
+      };
+    });
+  }
+  
+  _generateBarcode(baseProduct, size, index) {
+    // Generar código único: BASE-SIZE-INDEX
+    const base = baseProduct.code || baseProduct.name.substring(0, 4).toUpperCase();
+    return base + '-' + size + '-' + String(index).padStart(3, '0');
+  }
+}
+```
+
 ## Componentes e Interfaces
 
 ### Modelo de Datos (Google Sheets)
@@ -368,7 +485,32 @@ class CacheManager {
 
 #### CAT_Products (Catálogo de Productos)
 ```
-| id | barcode | name | description | price | category | min_stock | active | created_at | updated_at |
+| id | barcode | name | description | price | purchase_price | category | line_id | brand_id | size_id | min_stock | entry_date | active | created_at | updated_at |
+```
+
+#### CAT_Lines (Líneas de Producto)
+```
+| id | code | name | description | active | created_at |
+```
+
+#### CAT_Categories (Categorías)
+```
+| id | code | name | line_id | description | active | created_at |
+```
+
+#### CAT_Brands (Marcas)
+```
+| id | code | name | description | active | created_at |
+```
+
+#### CAT_Sizes (Tallas)
+```
+| id | code | name | order | active | created_at |
+```
+
+#### CAT_Suppliers (Proveedores)
+```
+| id | code | name | contact_name | phone | email | address | payment_terms | active | created_at |
 ```
 
 #### INV_Stock (Stock por Almacén)
@@ -841,6 +983,42 @@ Después de analizar todos los criterios de aceptación, he identificado las sig
 #### Propiedad 44: Validación de Datos de Entrada
 *Para cualquier* dato de entrada en operaciones críticas, el sistema debe validar: tipos de datos correctos, rangos numéricos válidos, formatos de fecha válidos, longitudes de texto dentro de límites y presencia de campos requeridos; si alguna validación falla, la operación debe rechazarse con mensaje de error descriptivo.
 **Valida: Requisitos 30.1, 30.3, 30.4**
+
+#### Propiedad 45: Normalización de Respuestas Backend
+*Para cualquier* respuesta del backend que contenga objetos Date, el sistema debe convertirlos a strings ISO antes de enviarlos al frontend.
+**Valida: Requisitos 31.1**
+
+#### Propiedad 46: Estructura de Respuesta de Operaciones Críticas
+*Para cualquier* función del backend llamada por google.script.run, la respuesta debe ser un objeto con estructura {success: boolean, data/error: any}.
+**Valida: Requisitos 31.2, 31.3**
+
+#### Propiedad 47: Integridad Referencial de Atributos
+*Para cualquier* producto creado, los valores de line_id, category_id, brand_id y size_id deben corresponder a registros existentes en sus respectivas tablas maestras.
+**Valida: Requisitos 32.3, 32.5**
+
+#### Propiedad 48: Unicidad de Códigos de Barras en Ingreso Masivo
+*Para cualquier* conjunto de productos creados mediante createBulkProducts, todos los códigos de barras generados deben ser únicos entre sí y no existir previamente en el catálogo.
+**Valida: Requisitos 33.4**
+
+#### Propiedad 49: Consistencia de Distribución de Tallas
+*Para cualquier* ingreso masivo con distribución "NS, NM, NL", la suma de productos creados debe ser igual a N + N + N, y cada producto debe tener asignada la talla correspondiente.
+**Valida: Requisitos 33.2**
+
+#### Propiedad 50: Cálculo de Mercadería Estancada
+*Para cualquier* producto cuya entry_date es anterior a (fecha_actual - 180 días), ese producto debe aparecer en el conteo de mercadería estancada del dashboard.
+**Valida: Requisitos 34.1, 34.2**
+
+#### Propiedad 51: Detección de Cumpleaños
+*Para cualquier* cliente cuya fecha de cumpleaños coincide con la fecha actual (día y mes), el sistema debe mostrar una alerta de cumpleaños al cargar ese cliente en el POS.
+**Valida: Requisitos 35.1, 35.2**
+
+#### Propiedad 52: Invariante de Stock en Obsequios
+*Para cualquier* salida de inventario con motivo GIFT_BIRTHDAY, el stock del producto debe decrementar en la cantidad especificada, pero no debe generarse ingreso en el turno de caja.
+**Valida: Requisitos 35.4, 35.5**
+
+#### Propiedad 53: Manejo de Errores en DataTables
+*Para cualquier* instancia de DataTables configurada, si la llamada Ajax falla, la tabla debe limpiarse y mostrar un mensaje amigable en lugar del error genérico de DataTables.
+**Valida: Requisitos 38.1, 38.2**
 
 ## Manejo de Errores
 

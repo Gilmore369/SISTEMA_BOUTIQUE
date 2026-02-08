@@ -708,6 +708,234 @@ Este plan descompone el sistema Adiction Boutique Suite en tareas incrementales 
   - Realizar pruebas de carga básicas
   - Preguntar al usuario si está listo para producción
 
+### Milestone 7: Mejoras de Comunicación y Catálogos
+
+- [x] 78. Implementar normalización de respuestas del backend
+  - Crear archivo ResponseNormalizer.gs
+  - Implementar función safeResponse(data) que convierta Date a ISO strings
+  - Implementar función wrapResponse(fn) que envuelva operaciones en try-catch
+  - Modificar todas las funciones llamadas por google.script.run para usar wrapResponse
+  - Asegurar que todas las respuestas tienen estructura {success, data/error}
+  - _Requisitos: 31.1, 31.2, 31.3_
+
+- [ ]* 79. Escribir property tests para normalización de respuestas
+  - **Propiedad 45: Normalización de Respuestas Backend**
+  - **Valida: Requisitos 31.1**
+  - **Propiedad 46: Estructura de Respuesta de Operaciones Críticas**
+  - **Valida: Requisitos 31.2, 31.3**
+
+- [x] 80. Actualizar renderBasePage para inyectar variables globales
+  - Modificar función renderBasePage en Main.gs
+  - Inyectar template.scriptUrl = ScriptApp.getService().getUrl()
+  - Inyectar template.userName = userData.name
+  - Verificar que las variables están disponibles en todas las páginas
+  - _Requisitos: 31.4_
+
+- [x] 81. Crear tablas maestras de atributos
+  - Crear hoja CAT_Lines con headers y formato
+  - Crear hoja CAT_Categories con headers y formato
+  - Crear hoja CAT_Brands con headers y formato
+  - Crear hoja CAT_Sizes con headers y formato
+  - Crear hoja CAT_Suppliers con headers y formato
+  - Poblar con datos de ejemplo
+  - _Requisitos: 32.1_
+
+- [x] 82. Implementar repositorios para tablas maestras
+  - [x] 82.1 Crear LineRepository para CAT_Lines
+    - Heredar de BaseRepository
+    - Implementar método findByCode(code)
+    - _Requisitos: 32.2_
+  
+  - [x] 82.2 Crear CategoryRepository para CAT_Categories
+    - Heredar de BaseRepository
+    - Implementar método findByLine(lineId)
+    - _Requisitos: 32.2_
+  
+  - [x] 82.3 Crear BrandRepository para CAT_Brands
+    - Heredar de BaseRepository
+    - Implementar método findByCode(code)
+    - _Requisitos: 32.2_
+  
+  - [x] 82.4 Crear SizeRepository para CAT_Sizes
+    - Heredar de BaseRepository
+    - Implementar método findByCode(code)
+    - Implementar método findAllOrdered() ordenando por campo order
+    - _Requisitos: 32.2_
+  
+  - [x] 82.5 Crear SupplierRepository para CAT_Suppliers
+    - Heredar de BaseRepository
+    - Implementar método findByCode(code)
+    - Implementar método search(query)
+    - _Requisitos: 32.2_
+
+- [x] 83. Actualizar ProductRepository para validar atributos
+  - Modificar método create() para validar line_id, category_id, brand_id, size_id
+  - Verificar que los IDs existen en tablas maestras antes de crear producto
+  - Lanzar error descriptivo si algún atributo no es válido
+  - _Requisitos: 32.3, 32.5_
+
+- [ ]* 84. Escribir property tests para integridad referencial
+  - **Propiedad 47: Integridad Referencial de Atributos**
+  - **Valida: Requisitos 32.3, 32.5**
+
+- [x] 85. Implementar BulkProductService para ingreso masivo
+  - Crear archivo BulkProductService.gs
+  - Implementar createBulkProducts(baseProduct, sizeDistribution, purchasePrice)
+  - Implementar _parseSizeDistribution(distribution) para parsear "2S, 3M, 4L"
+  - Implementar _generateBarcode(baseProduct, size, index) para códigos únicos
+  - Validar que las tallas especificadas existen en CAT_Sizes
+  - Asignar automáticamente entry_date (fecha actual) a cada variante
+  - _Requisitos: 33.1, 33.2, 33.3, 33.4, 33.5_
+
+- [ ]* 86. Escribir property tests para ingreso masivo
+  - **Propiedad 48: Unicidad de Códigos de Barras en Ingreso Masivo**
+  - **Valida: Requisitos 33.4**
+  - **Propiedad 49: Consistencia de Distribución de Tallas**
+  - **Valida: Requisitos 33.2**
+
+- [ ] 87. Crear vista de ingreso masivo de productos
+  - Crear archivo BulkProductForm.html
+  - Implementar formulario con campos: producto base, distribución de tallas, precio de compra
+  - Agregar ayuda visual para formato de distribución (ej: "2S, 3M, 4L")
+  - Mostrar preview de productos que se crearán antes de confirmar
+  - Ejecutar createBulkProducts() al confirmar
+  - Mostrar resumen de productos creados con códigos de barras
+  - _Requisitos: 33.1, 33.2_
+
+- [ ] 88. Crear vistas CRUD para tablas maestras
+  - [ ] 88.1 Crear LineList.html y LineForm.html para líneas
+    - Listado con DataTables
+    - Formulario de creación/edición
+    - _Requisitos: 32.1, 32.2_
+  
+  - [ ] 88.2 Crear CategoryList.html y CategoryForm.html para categorías
+    - Listado con DataTables y filtro por línea
+    - Formulario con selector de línea
+    - _Requisitos: 32.1, 32.2_
+  
+  - [ ] 88.3 Crear BrandList.html y BrandForm.html para marcas
+    - Listado con DataTables
+    - Formulario de creación/edición
+    - _Requisitos: 32.1, 32.2_
+  
+  - [ ] 88.4 Crear SizeList.html y SizeForm.html para tallas
+    - Listado con DataTables ordenado por campo order
+    - Formulario con campo order para ordenamiento
+    - _Requisitos: 32.1, 32.2_
+  
+  - [ ] 88.5 Crear SupplierList.html y SupplierForm.html para proveedores
+    - Listado con DataTables
+    - Formulario completo con todos los campos
+    - _Requisitos: 32.1, 32.2_
+
+- [ ] 89. Checkpoint - Verificar catálogos maestros
+  - Verificar que se pueden crear y editar atributos maestros
+  - Verificar que el ingreso masivo funciona correctamente
+  - Verificar que los códigos de barras son únicos
+  - Verificar que la validación de integridad referencial funciona
+  - Preguntar al usuario si hay dudas o ajustes necesarios
+
+### Milestone 8: Fidelización y Dashboard Interactivo
+
+- [x] 90. Agregar campo birthday a CRM_Clients
+  - Modificar hoja CRM_Clients para incluir columna birthday
+  - Actualizar ClientRepository para manejar el campo birthday
+  - Actualizar ClientForm.html para incluir selector de fecha de cumpleaños
+  - _Requisitos: 35.1_
+
+- [x] 91. Implementar detección de cumpleaños en POS
+  - Modificar POSService o crear BirthdayService
+  - Implementar checkBirthday(clientId) que compare fecha actual con birthday
+  - Modificar vista POS.html para mostrar alerta visual si es cumpleaños
+  - Usar Bootstrap alert con estilo destacado (ej: alert-success con icono)
+  - _Requisitos: 35.1, 35.2_
+
+- [ ]* 92. Escribir property tests para detección de cumpleaños
+  - **Propiedad 51: Detección de Cumpleaños**
+  - **Valida: Requisitos 35.1, 35.2**
+
+- [x] 93. Implementar descuento automático de cumpleaños
+  - Agregar parámetro BIRTHDAY_DISCOUNT_PERCENT en CFG_Params (15-20%)
+  - Modificar POSService para aplicar descuento automático si es cumpleaños
+  - Agregar botón "Aplicar Descuento Cumpleaños" en POS
+  - Registrar en auditoría con motivo BIRTHDAY_DISCOUNT
+  - _Requisitos: 35.3_
+
+- [x] 94. Implementar registro de obsequios de cumpleaños
+  - Agregar tipo de movimiento GIFT_BIRTHDAY en sistema
+  - Modificar POSService para permitir ventas con precio 0 y motivo GIFT_BIRTHDAY
+  - Decrementar stock pero no generar ingreso en caja
+  - Registrar movimiento de inventario con motivo GIFT_BIRTHDAY
+  - Auditar obsequios de cumpleaños
+  - _Requisitos: 35.4, 35.5_
+
+- [ ]* 95. Escribir property tests para obsequios
+  - **Propiedad 52: Invariante de Stock en Obsequios**
+  - **Valida: Requisitos 35.4, 35.5**
+
+- [x] 96. Implementar cálculo de mercadería estancada en dashboard
+  - Modificar getDashboardData() en ReportService o DashboardService
+  - Calcular productos con entry_date > 180 días
+  - Retornar conteo de productos estancados
+  - _Requisitos: 34.1_
+
+- [x] 97. Agregar tarjeta de mercadería estancada al dashboard
+  - Modificar Dashboard.html para incluir nueva tarjeta
+  - Mostrar conteo de productos estancados
+  - Hacer la tarjeta clickeable (botón o enlace)
+  - Agregar icono apropiado (ej: bi-clock-history)
+  - _Requisitos: 34.2_
+
+- [x] 98. Crear vista de mercadería estancada
+  - Crear archivo StalledInventory.html
+  - Mostrar productos con entry_date > 180 días
+  - Incluir columnas: nombre, talla, días en inventario, precio compra, precio venta
+  - Calcular días en inventario dinámicamente
+  - Implementar acciones: aplicar descuento, transferir, marcar para liquidación
+  - _Requisitos: 34.3, 34.4, 34.5_
+
+- [ ]* 99. Escribir property tests para mercadería estancada
+  - **Propiedad 50: Cálculo de Mercadería Estancada**
+  - **Valida: Requisitos 34.1, 34.2**
+
+- [x] 100. Hacer tarjetas del dashboard interactivas
+  - Modificar Dashboard.html para convertir tarjetas en botones/enlaces
+  - Implementar función MapsTo(modulo, filtros) para navegación
+  - Tarjeta "Ventas" → navegar a ventas con filtro fecha actual
+  - Tarjeta "Cobros" → navegar a cobranzas con filtro cuotas del día
+  - Tarjeta "Stock" → navegar a inventario
+  - Tarjeta "Mercadería Estancada" → navegar a vista de estancados
+  - Agregar estilos CSS: cursor pointer, hover effects
+  - _Requisitos: 37.1, 37.2, 37.3, 37.4, 37.5_
+
+- [x] 101. Agregar enlaces de Proveedores y Compras al sidebar
+  - Modificar Layout.html para incluir nuevos enlaces
+  - Agregar enlace "Proveedores" con icono bi-truck
+  - Agregar enlace "Compras" con icono bi-cart-plus
+  - Organizar sidebar en secciones: Ventas, Inventario, Finanzas, Configuración
+  - Mantener estado activo según página actual
+  - _Requisitos: 36.1, 36.2, 36.3, 36.4, 36.5_
+
+- [x] 102. Implementar manejo robusto de errores en DataTables
+  - Revisar todos los archivos HTML con DataTables
+  - Agregar parámetro error: function(xhr, error, thrown) {...} en configuración Ajax
+  - En función error: limpiar tabla, mostrar mensaje amigable, registrar en console
+  - Agregar botón "Reintentar" para recargar datos
+  - Implementar función global handleDataTableError() reutilizable
+  - _Requisitos: 38.1, 38.2, 38.3, 38.4, 38.5_
+
+- [ ]* 103. Escribir property tests para manejo de errores
+  - **Propiedad 53: Manejo de Errores en DataTables**
+  - **Valida: Requisitos 38.1, 38.2**
+
+- [x] 104. Checkpoint - Verificar fidelización y dashboard
+  - Verificar que las alertas de cumpleaños funcionan
+  - Verificar que los descuentos y obsequios se registran correctamente
+  - Verificar que la mercadería estancada se calcula bien
+  - Verificar que las tarjetas del dashboard son interactivas
+  - Verificar que el manejo de errores en DataTables funciona
+  - Preguntar al usuario si hay dudas o ajustes necesarios
+
 ## Notas
 
 - Las tareas marcadas con `*` son opcionales (principalmente tests) y pueden omitirse para un MVP más rápido
@@ -718,3 +946,4 @@ Este plan descompone el sistema Adiction Boutique Suite en tareas incrementales 
 - La implementación sigue el patrón de capas: Presentation → Business Logic → Data Access → Persistence
 - Se recomienda seguir el orden de los milestones para construcción incremental
 - Cada milestone entrega funcionalidad completa y testeable
+- Los nuevos milestones 7 y 8 agregan: comunicación segura, catálogos maestros, ingreso masivo, fidelización, dashboard interactivo y manejo robusto de errores

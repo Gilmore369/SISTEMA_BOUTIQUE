@@ -161,7 +161,11 @@
           },
           error: function(xhr, status, error) {
             console.error('Error AJAX:', error);
-            alert('Error de conexión al generar reporte: ' + error);
+            if (window.handleDataTableError) {
+              window.handleDataTableError(xhr, error, status, 'inventoryTable');
+            } else {
+              alert('Error de conexión al generar reporte: ' + error);
+            }
           }
         });
       }

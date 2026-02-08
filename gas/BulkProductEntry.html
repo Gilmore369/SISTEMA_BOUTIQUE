@@ -652,7 +652,14 @@
     }
     
     function goBack() {
-      window.top.location.href = '<?= getScriptUrl() ?>?page=products';
+      // Usar window.SCRIPT_URL que está definido globalmente en index.html
+      if (typeof window.SCRIPT_URL !== 'undefined') {
+        window.top.location.href = window.SCRIPT_URL + '?page=products';
+      } else {
+        // Fallback: usar window.location para construir la URL
+        const baseUrl = window.location.href.split('?')[0];
+        window.top.location.href = baseUrl + '?page=products';
+      }
     }
   </script>
 </body>

@@ -62,6 +62,9 @@
       </div>
     </div>
     
+    <!-- Birthday Alert Container -->
+    <div id="birthdayAlert" style="display: none;"></div>
+    
     <div class="row">
       
       <!-- Left Column: Product Search & Cart -->
@@ -192,6 +195,16 @@
                        onchange="updateTotals()">
               </div>
             </div>
+            
+            <!-- Birthday Discount Button (hidden by default) -->
+            <div id="birthdayDiscountContainer" class="mb-2" style="display: none;">
+              <button type="button" 
+                      class="btn btn-sm btn-warning w-100" 
+                      onclick="applyBirthdayDiscount()">
+                <i class="bi bi-gift"></i> Aplicar Descuento Cumpleaños
+              </button>
+            </div>
+            
             <hr>
             <div class="d-flex justify-content-between align-items-center">
               <span class="h5 mb-0">TOTAL:</span>
@@ -255,6 +268,18 @@
         } else {
           $('#clientSelection').hide();
           $('#installmentsSelection').hide();
+          // Hide birthday alert when switching to cash
+          $('#birthdayAlert').hide();
+        }
+      });
+      
+      // Handle client selection change
+      $('#clientSelect').change(function() {
+        const clientId = $(this).val();
+        if (clientId) {
+          checkClientBirthday(clientId);
+        } else {
+          $('#birthdayAlert').hide();
         }
       });
       
@@ -649,6 +674,87 @@
           alert('Error al enviar factura: ' + error.message);
         })
         .sendInvoiceEmail(invoiceId, email);
+    }
+    
+    function checkClientBirthday(clientId) {
+      console.log('Verificando cumpleaños del cliente:', clientId);
+      
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response.success) {
+            const result = response.data;
+            
+            if (result.isBirthday) {
+              // Mostrar alerta de cumpleaños
+              const alertHtml = `
+                <div class="alert alert-success alert-dismissible fade show mb-4" role="alert">
+                  <h5 class="alert-heading">
+                    <i class="bi bi-gift-fill"></i> ¡Feliz Cumpleaños!
+                  </h5>
+                  <p class="mb-0">
+                    <strong>${result.client.name}</strong> está de cumpleaños hoy. 
+                    Recuerda aplicar el descuento especial o entregar un obsequio.
+                  </p>
+                  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+              `;
+              $('#birthdayAlert').html(alertHtml).show();
+              
+              // Mostrar botón de descuento de cumpleaños
+              $('#birthdayDiscountContainer').show();
+            } else {
+              // Ocultar alerta y botón si no es cumpleaños
+              $('#birthdayAlert').hide();
+              $('#birthdayDiscountContainer').hide();
+            }
+          } else {
+            console.error('Error al verificar cumpleaños:', response.error);
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error al verificar cumpleaños:', error.message);
+        })
+        .checkClientBirthday(clientId);
+    }
+    
+    function applyBirthdayDiscount() {
+      const clientId = $('#clientSelect').val();
+      
+      if (!clientId) {
+        alert('Por favor seleccione un cliente');
+        return;
+      }
+      
+      const subtotal = parseFloat($('#subtotalAmount').text()) || 0;
+      
+      if (subtotal <= 0) {
+        alert('El carrito está vacío');
+        return;
+      }
+      
+      // Llamar al backend para calcular descuento
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response.success) {
+            const result = response.data;
+            
+            // Aplicar descuento
+            $('#discountAmount').val(result.discountAmount.toFixed(2));
+            updateTotals();
+            
+            // Mostrar mensaje
+            alert(`Descuento de cumpleaños aplicado: ${result.discountPercent}%\nDescuento: S/ ${result.discountAmount.toFixed(2)}`);
+            
+            // Ocultar botón después de aplicar
+            $('#birthdayDiscountContainer').hide();
+          } else {
+            alert('Error al aplicar descuento: ' + response.error);
+          }
+        })
+        .withFailureHandler(function(error) {
+          alert('Error al aplicar descuento: ' + error.message);
+        })
+        .applyBirthdayDiscountWrapper(subtotal, clientId, userId);
     }
   </script>
   

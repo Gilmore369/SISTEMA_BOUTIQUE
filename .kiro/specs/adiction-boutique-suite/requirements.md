@@ -387,6 +387,102 @@ Adiction Boutique Suite es un sistema integral de gestión para dos tiendas de r
 4. WHEN una validación falla, THE Sistema SHALL retornar mensajes de error descriptivos
 5. THE Sistema SHALL NO utilizar librerías de validación externas
 
+### Requisito 31: Comunicación Segura Backend-Frontend
+
+**User Story:** Como desarrollador, quiero garantizar que la comunicación entre el backend (Apps Script) y el frontend (HTML) sea robusta y maneje errores correctamente, para evitar fallos silenciosos y pérdida de datos.
+
+#### Criterios de Aceptación
+
+1. THE Sistema SHALL normalizar todas las respuestas del backend convirtiendo objetos Date a strings ISO y manejando valores nulos
+2. WHEN una función del backend es llamada por google.script.run, THE Sistema SHALL envolver la ejecución en try-catch y retornar un objeto estructurado {success: true/false, data/error}
+3. THE Sistema SHALL garantizar que ninguna función llamada por google.script.run falle sin retornar un objeto de respuesta
+4. WHEN se renderiza una página base, THE Sistema SHALL inyectar variables globales: scriptUrl y userName
+5. THE Sistema SHALL proporcionar una función global safeResponse(data) para normalización consistente de datos
+
+### Requisito 32: Gestión de Atributos y Proveedores
+
+**User Story:** Como administrador, quiero gestionar catálogos maestros de líneas, categorías, marcas, tallas y proveedores, para mantener datos consistentes y facilitar el ingreso de productos.
+
+#### Criterios de Aceptación
+
+1. THE Sistema SHALL mantener tablas maestras para: CAT_Lines, CAT_Categories, CAT_Brands, CAT_Sizes y CAT_Suppliers
+2. THE Sistema SHALL proporcionar repositorios para cada tabla maestra con operaciones CRUD
+3. WHEN se crea un producto, THE Sistema SHALL validar que los atributos (línea, categoría, marca, talla) existen en las tablas maestras
+4. THE Sistema SHALL permitir consultar y filtrar productos por cualquier atributo maestro
+5. THE Sistema SHALL mantener integridad referencial entre productos y tablas maestras
+
+### Requisito 33: Ingreso Masivo de Productos
+
+**User Story:** Como administrador, quiero ingresar productos masivamente con distribución de tallas, para agilizar la carga de inventario de nuevas colecciones.
+
+#### Criterios de Aceptación
+
+1. THE Sistema SHALL proporcionar una función createBulkProducts que reciba: producto base, distribución de tallas y precio de compra
+2. WHEN se especifica una distribución de tallas (ej: "2S, 3M, 4L"), THE Sistema SHALL crear una fila en CAT_Products por cada variante de talla
+3. WHEN se crea cada variante, THE Sistema SHALL asignar automáticamente: purchase_price, entry_date (fecha actual) y un SKU/código único
+4. THE Sistema SHALL generar códigos de barras únicos para cada variante y almacenarlos en la columna barcode
+5. THE Sistema SHALL validar que la distribución de tallas especificada corresponde a tallas existentes en CAT_Sizes
+
+### Requisito 34: Alertas de Mercadería Estancada
+
+**User Story:** Como administrador, quiero identificar productos con más de 6 meses en inventario, para tomar decisiones de liquidación o promoción.
+
+#### Criterios de Aceptación
+
+1. WHEN se consulta el dashboard, THE Sistema SHALL calcular productos cuya entry_date sea mayor a 180 días
+2. THE Sistema SHALL mostrar una tarjeta "Mercadería Estancada" en el dashboard con el conteo de productos
+3. WHEN se hace clic en la tarjeta, THE Sistema SHALL navegar a una vista filtrada mostrando solo productos estancados
+4. THE Sistema SHALL mostrar para cada producto estancado: nombre, talla, días en inventario, precio de compra y precio de venta
+5. THE Sistema SHALL permitir aplicar acciones masivas a productos estancados (descuentos, transferencias)
+
+### Requisito 35: Módulo de Cumpleaños y Fidelización
+
+**User Story:** Como vendedor, quiero identificar clientes que cumplen años y ofrecerles beneficios especiales, para fidelizar y mejorar la experiencia del cliente.
+
+#### Criterios de Aceptación
+
+1. WHEN se carga un cliente en el POS, THE Sistema SHALL verificar si la fecha actual coincide con su fecha de cumpleaños
+2. IF es el cumpleaños del cliente, THEN THE Sistema SHALL mostrar una alerta visual destacada en el POS
+3. THE Sistema SHALL permitir aplicar un descuento automático de cumpleaños (15-20% configurable)
+4. THE Sistema SHALL permitir registrar una salida de inventario con motivo GIFT_BIRTHDAY y precio 0
+5. WHEN se registra un obsequio de cumpleaños, THE Sistema SHALL decrementar el stock pero no generar ingreso en caja
+
+### Requisito 36: Navegación Mejorada y Accesos Directos
+
+**User Story:** Como usuario, quiero acceder rápidamente a módulos de proveedores y compras desde el sidebar, para mejorar la eficiencia de navegación.
+
+#### Criterios de Aceptación
+
+1. THE Sistema SHALL incluir en el sidebar enlaces a "Proveedores" y "Compras"
+2. WHEN se hace clic en "Proveedores", THE Sistema SHALL mostrar el listado de proveedores con DataTables
+3. WHEN se hace clic en "Compras", THE Sistema SHALL mostrar el módulo de registro de compras a proveedores
+4. THE Sistema SHALL mantener el estado activo del menú según la página actual
+5. THE Sistema SHALL organizar el sidebar en secciones lógicas (Ventas, Inventario, Finanzas, Configuración)
+
+### Requisito 37: Dashboard Interactivo con Filtros
+
+**User Story:** Como usuario, quiero que las tarjetas del dashboard sean interactivas y me lleven a vistas filtradas, para navegar rápidamente a información relevante.
+
+#### Criterios de Aceptación
+
+1. WHEN se hace clic en la tarjeta "Ventas", THE Sistema SHALL navegar al módulo de ventas con filtro de fecha actual
+2. WHEN se hace clic en la tarjeta "Cobros", THE Sistema SHALL navegar al módulo de cobranzas con filtro de cuotas del día
+3. WHEN se hace clic en la tarjeta "Stock", THE Sistema SHALL navegar al módulo de inventario
+4. WHEN se hace clic en la tarjeta "Mercadería Estancada", THE Sistema SHALL navegar al inventario filtrado por productos > 180 días
+5. THE Sistema SHALL implementar las tarjetas como botones o enlaces con cursor pointer y hover effects
+
+### Requisito 38: Manejo Robusto de Errores en DataTables
+
+**User Story:** Como usuario, quiero que las tablas manejen errores de servidor gracefully, para evitar mensajes de error confusos y mantener la interfaz funcional.
+
+#### Criterios de Aceptación
+
+1. WHEN una llamada Ajax de DataTables falla, THE Sistema SHALL limpiar la tabla en lugar de mostrar error genérico
+2. THE Sistema SHALL mostrar un mensaje amigable al usuario indicando que no se pudieron cargar los datos
+3. THE Sistema SHALL registrar el error en el log del navegador para debugging
+4. THE Sistema SHALL proporcionar un botón "Reintentar" para volver a cargar los datos
+5. THE Sistema SHALL configurar el parámetro error en todas las instancias de DataTables con manejo personalizado
+
 ## Notas Finales
 
-Este documento define los requisitos funcionales del sistema Adiction Boutique Suite. Todos los requisitos están escritos siguiendo los patrones EARS y las reglas de calidad INCOSE para garantizar claridad, testabilidad y completitud. Los requisitos cubren los módulos principales: autenticación, inventario, POS, clientes, crédito, cobranzas, caja, facturación y reportes.
+Este documento define los requisitos funcionales del sistema Adiction Boutique Suite. Todos los requisitos están escritos siguiendo los patrones EARS y las reglas de calidad INCOSE para garantizar claridad, testabilidad y completitud. Los requisitos cubren los módulos principales: autenticación, inventario, POS, clientes, crédito, cobranzas, caja, facturación, reportes, comunicación segura, gestión de atributos, ingreso masivo, alertas de mercadería, fidelización y navegación mejorada.

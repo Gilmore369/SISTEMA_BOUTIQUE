@@ -1,0 +1,248 @@
+<!-- SupplierList.html - Vista de Listado de Proveedores -->
+<div class="container-fluid">
+  <div class="row mb-3">
+    <div class="col-md-12">
+      <div class="d-flex justify-content-between align-items-center">
+        <h4><i class="bi bi-truck"></i> Gestión de Proveedores</h4>
+        <button class="btn btn-primary" onclick="createSupplier()">
+          <i class="bi bi-plus-circle"></i> Nuevo Proveedor
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="row">
+    <div class="col-md-12">
+      <div class="card">
+        <div class="card-body">
+          <table id="suppliersTable" class="table table-striped table-hover">
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Nombre</th>
+                <th>Contacto</th>
+                <th>Teléfono</th>
+                <th>Email</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="7" class="text-center">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para crear/editar proveedor -->
+<div class="modal fade" id="supplierModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="supplierModalTitle">Nuevo Proveedor</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="supplierForm">
+          <input type="hidden" id="supplierId">
+          
+          <div class="mb-3">
+            <label for="supplierCode" class="form-label">Código *</label>
+            <input type="text" class="form-control" id="supplierCode" required>
+          </div>
+          
+          <div class="mb-3">
+            <label for="supplierName" class="form-label">Nombre *</label>
+            <input type="text" class="form-control" id="supplierName" required>
+          </div>
+          
+          <div class="mb-3">
+            <label for="supplierContact" class="form-label">Contacto</label>
+            <input type="text" class="form-control" id="supplierContact">
+          </div>
+          
+          <div class="mb-3">
+            <label for="supplierPhone" class="form-label">Teléfono</label>
+            <input type="tel" class="form-control" id="supplierPhone">
+          </div>
+          
+          <div class="mb-3">
+            <label for="supplierEmail" class="form-label">Email</label>
+            <input type="email" class="form-control" id="supplierEmail">
+          </div>
+          
+          <div class="mb-3">
+            <label for="supplierAddress" class="form-label">Dirección</label>
+            <textarea class="form-control" id="supplierAddress" rows="2"></textarea>
+          </div>
+          
+          <div class="mb-3 form-check">
+            <input type="checkbox" class="form-check-input" id="supplierActive" checked>
+            <label class="form-check-label" for="supplierActive">Activo</label>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="saveSupplier()">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let suppliersTable;
+  let supplierModal;
+  
+  $(document).ready(function() {
+    console.log('Inicializando vista de proveedores...');
+    
+    // Inicializar modal
+    supplierModal = new bootstrap.Modal(document.getElementById('supplierModal'));
+    
+    // Inicializar DataTable
+    suppliersTable = $('#suppliersTable').DataTable({
+      language: {
+        url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
+      },
+      pageLength: 25,
+      lengthMenu: [[25, 50, 100], [25, 50, 100]],
+      order: [[1, 'asc']],
+      processing: true,
+      columns: [
+        { data: 'code' },
+        { data: 'name' },
+        { data: 'contact_name' },
+        { data: 'phone' },
+        { data: 'email' },
+        { 
+          data: 'active',
+          render: function(data) {
+            return data ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-secondary">Inactivo</span>';
+          }
+        },
+        {
+          data: null,
+          orderable: false,
+          render: function(data, type, row) {
+            return '<button class="btn btn-sm btn-outline-primary" onclick="editSupplier(\'' + row.id + '\')"><i class="bi bi-pencil"></i></button>';
+          }
+        }
+      ]
+    });
+    
+    // Cargar datos
+    loadSuppliers();
+  });
+  
+  function loadSuppliers() {
+    console.log('Cargando proveedores...');
+    
+    google.script.run
+      .withSuccessHandler(function(response) {
+        console.log('Proveedores recibidos:', response);
+        
+        if (response.success && response.data) {
+          suppliersTable.clear();
+          suppliersTable.rows.add(response.data);
+          suppliersTable.draw();
+        } else {
+          console.error('Error al cargar proveedores:', response.error);
+          alert('Error al cargar proveedores: ' + (response.error || 'Error desconocido'));
+        }
+      })
+      .withFailureHandler(function(error) {
+        console.error('Error al cargar proveedores:', error);
+        alert('Error al cargar proveedores: ' + error.message);
+      })
+      .getSuppliers();
+  }
+  
+  function createSupplier() {
+    // Limpiar formulario
+    document.getElementById('supplierForm').reset();
+    document.getElementById('supplierId').value = '';
+    document.getElementById('supplierModalTitle').textContent = 'Nuevo Proveedor';
+    document.getElementById('supplierActive').checked = true;
+    
+    // Mostrar modal
+    supplierModal.show();
+  }
+  
+  function editSupplier(supplierId) {
+    console.log('Editando proveedor:', supplierId);
+    
+    google.script.run
+      .withSuccessHandler(function(response) {
+        if (response.success && response.data) {
+          const supplier = response.data;
+          
+          document.getElementById('supplierId').value = supplier.id;
+          document.getElementById('supplierCode').value = supplier.code || '';
+          document.getElementById('supplierName').value = supplier.name || '';
+          document.getElementById('supplierContact').value = supplier.contact_name || '';
+          document.getElementById('supplierPhone').value = supplier.phone || '';
+          document.getElementById('supplierEmail').value = supplier.email || '';
+          document.getElementById('supplierAddress').value = supplier.address || '';
+          document.getElementById('supplierActive').checked = supplier.active;
+          
+          document.getElementById('supplierModalTitle').textContent = 'Editar Proveedor';
+          supplierModal.show();
+        } else {
+          alert('Error al cargar proveedor: ' + (response.error || 'Error desconocido'));
+        }
+      })
+      .withFailureHandler(function(error) {
+        alert('Error al cargar proveedor: ' + error.message);
+      })
+      .getSupplier(supplierId);
+  }
+  
+  function saveSupplier() {
+    const supplierId = document.getElementById('supplierId').value;
+    const supplierData = {
+      id: supplierId || undefined,
+      code: document.getElementById('supplierCode').value,
+      name: document.getElementById('supplierName').value,
+      contact_name: document.getElementById('supplierContact').value,
+      phone: document.getElementById('supplierPhone').value,
+      email: document.getElementById('supplierEmail').value,
+      address: document.getElementById('supplierAddress').value,
+      active: document.getElementById('supplierActive').checked
+    };
+    
+    // Validar campos requeridos
+    if (!supplierData.code || !supplierData.name) {
+      alert('Por favor complete los campos requeridos (Código y Nombre)');
+      return;
+    }
+    
+    console.log('Guardando proveedor:', supplierData);
+    
+    const action = supplierId ? 'updateSupplier' : 'createSupplier';
+    
+    google.script.run
+      .withSuccessHandler(function(response) {
+        if (response.success) {
+          alert('Proveedor guardado correctamente');
+          supplierModal.hide();
+          loadSuppliers();
+        } else {
+          alert('Error al guardar proveedor: ' + (response.error || 'Error desconocido'));
+        }
+      })
+      .withFailureHandler(function(error) {
+        alert('Error al guardar proveedor: ' + error.message);
+      })
+      [action](supplierData);
+  }
+</script>

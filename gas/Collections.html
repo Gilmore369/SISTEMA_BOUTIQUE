@@ -431,6 +431,9 @@
           },
           error: function(xhr, error, thrown) {
             console.error('Error AJAX overdue:', error, thrown);
+            if (window.handleDataTableError) {
+              window.handleDataTableError(xhr, error, thrown, 'overdueTable');
+            }
           }
         },
         columns: [
@@ -491,6 +494,9 @@
           },
           error: function(xhr, error, thrown) {
             console.error('Error AJAX today:', error, thrown);
+            if (window.handleDataTableError) {
+              window.handleDataTableError(xhr, error, thrown, 'todayTable');
+            }
           }
         },
         columns: [
@@ -541,6 +547,9 @@
           },
           error: function(xhr, error, thrown) {
             console.error('Error AJAX week:', error, thrown);
+            if (window.handleDataTableError) {
+              window.handleDataTableError(xhr, error, thrown, 'weekTable');
+            }
           }
         },
         columns: [

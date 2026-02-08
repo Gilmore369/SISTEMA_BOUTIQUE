@@ -1,0 +1,206 @@
+<!-- PurchaseList.html - Vista de Listado de Compras -->
+<div class="container-fluid">
+  <div class="row mb-3">
+    <div class="col-md-12">
+      <div class="d-flex justify-content-between align-items-center">
+        <h4><i class="bi bi-cart-plus"></i> Gestión de Compras</h4>
+        <button class="btn btn-primary" onclick="createPurchase()">
+          <i class="bi bi-plus-circle"></i> Nueva Compra
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Filtros -->
+  <div class="row mb-3">
+    <div class="col-md-3">
+      <label class="form-label">Fecha Desde</label>
+      <input type="date" class="form-control" id="filterDateFrom">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Fecha Hasta</label>
+      <input type="date" class="form-control" id="filterDateTo">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Proveedor</label>
+      <select class="form-select" id="filterSupplier">
+        <option value="">Todos</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">&nbsp;</label>
+      <button class="btn btn-secondary w-100" onclick="applyFilters()">
+        <i class="bi bi-funnel"></i> Filtrar
+      </button>
+    </div>
+  </div>
+  
+  <div class="row">
+    <div class="col-md-12">
+      <div class="card">
+        <div class="card-body">
+          <table id="purchasesTable" class="table table-striped table-hover">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Proveedor</th>
+                <th>Documento</th>
+                <th>Total</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="6" class="text-center">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let purchasesTable;
+  
+  $(document).ready(function() {
+    console.log('Inicializando vista de compras...');
+    
+    // Inicializar DataTable
+    purchasesTable = $('#purchasesTable').DataTable({
+      language: {
+        url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
+      },
+      pageLength: 25,
+      lengthMenu: [[25, 50, 100], [25, 50, 100]],
+      order: [[0, 'desc']],
+      processing: true,
+      columns: [
+        { 
+          data: 'purchase_date',
+          render: function(data) {
+            if (!data) return '';
+            const date = new Date(data);
+            return date.toLocaleDateString('es-PE');
+          }
+        },
+        { data: 'supplier_name' },
+        { data: 'document_number' },
+        { 
+          data: 'total',
+          render: function(data) {
+            return 'S/ ' + parseFloat(data || 0).toFixed(2);
+          }
+        },
+        { 
+          data: 'status',
+          render: function(data) {
+            const badges = {
+              'PENDING': '<span class="badge bg-warning">Pendiente</span>',
+              'RECEIVED': '<span class="badge bg-success">Recibida</span>',
+              'CANCELLED': '<span class="badge bg-danger">Cancelada</span>'
+            };
+            return badges[data] || data;
+          }
+        },
+        {
+          data: null,
+          orderable: false,
+          render: function(data, type, row) {
+            return '<button class="btn btn-sm btn-outline-primary" onclick="viewPurchase(\'' + row.id + '\')"><i class="bi bi-eye"></i></button>';
+          }
+        }
+      ]
+    });
+    
+    // Cargar proveedores para filtro
+    loadSuppliersFilter();
+    
+    // Cargar datos
+    loadPurchases();
+  });
+  
+  function loadSuppliersFilter() {
+    google.script.run
+      .withSuccessHandler(function(response) {
+        if (response.success && response.data) {
+          const select = document.getElementById('filterSupplier');
+          response.data.forEach(function(supplier) {
+            if (supplier.active) {
+              const option = document.createElement('option');
+              option.value = supplier.id;
+              option.textContent = supplier.name;
+              select.appendChild(option);
+            }
+          });
+        }
+      })
+      .withFailureHandler(function(error) {
+        console.error('Error al cargar proveedores:', error);
+      })
+      .getSuppliers();
+  }
+  
+  function loadPurchases() {
+    console.log('Cargando compras...');
+    
+    google.script.run
+      .withSuccessHandler(function(response) {
+        console.log('Compras recibidas:', response);
+        
+        if (response.success && response.data) {
+          purchasesTable.clear();
+          purchasesTable.rows.add(response.data);
+          purchasesTable.draw();
+        } else {
+          console.error('Error al cargar compras:', response.error);
+          // Mostrar mensaje en la tabla
+          purchasesTable.clear();
+          purchasesTable.draw();
+        }
+      })
+      .withFailureHandler(function(error) {
+        console.error('Error al cargar compras:', error);
+        purchasesTable.clear();
+        purchasesTable.draw();
+      })
+      .getPurchases();
+  }
+  
+  function applyFilters() {
+    const filters = {
+      dateFrom: document.getElementById('filterDateFrom').value,
+      dateTo: document.getElementById('filterDateTo').value,
+      supplierId: document.getElementById('filterSupplier').value
+    };
+    
+    console.log('Aplicando filtros:', filters);
+    
+    google.script.run
+      .withSuccessHandler(function(response) {
+        if (response.success && response.data) {
+          purchasesTable.clear();
+          purchasesTable.rows.add(response.data);
+          purchasesTable.draw();
+        }
+      })
+      .withFailureHandler(function(error) {
+        console.error('Error al filtrar compras:', error);
+      })
+      .getPurchases(filters);
+  }
+  
+  function createPurchase() {
+    alert('Funcionalidad de crear compra pendiente de implementación');
+  }
+  
+  function viewPurchase(purchaseId) {
+    alert('Ver detalle de compra: ' + purchaseId + ' (funcionalidad pendiente)');
+  }
+</script>

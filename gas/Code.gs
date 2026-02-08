@@ -2,6 +2,10 @@
  * Code.gs - Punto de Entrada Principal
  * Adiction Boutique Suite
  * 
+ * VERSIÓN CON AUTENTICACIÓN DUAL:
+ * - Usuario/contraseña (funciona en modo incógnito)
+ * - Email de Google (fallback)
+ * 
  * Este archivo contiene las funciones principales de Google Apps Script:
  * - doGet(): Maneja solicitudes HTTP GET (páginas web)
  * - doPost(): Maneja solicitudes HTTP POST (API)
@@ -35,6 +39,66 @@
  * 5. Configurar la allowlist de usuarios en CFG_Users
  */
 
+// ============================================================================
+// AUTENTICACIÓN CON USUARIO/CONTRASEÑA
+// ============================================================================
+
+const USERS = {
+  'admin': 'admin123',
+  'gian': 'gian123',
+  'vendedor': 'vendedor123'
+};
+
+function generateToken(username) {
+  const date = new Date().toDateString();
+  return Utilities.base64Encode(username + ':' + date);
+}
+
+function renderLoginUserPass(attemptedUser, message) {
+  // Obtener la URL del script FUERA del template string
+  const scriptUrl = ScriptApp.getService().getUrl();
+  
+  const html = '<!DOCTYPE html>' +
+    '<html lang="es">' +
+    '<head>' +
+    '<meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+    '<title>Login - Adiction Boutique</title>' +
+    '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">' +
+    '<style>' +
+    'body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }' +
+    '.login-box { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); max-width: 400px; width: 100%; }' +
+    'h1 { text-align: center; color: #333; margin-bottom: 30px; }' +
+    '.btn-primary { width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; }' +
+    '</style>' +
+    '</head>' +
+    '<body>' +
+    '<div class="login-box">' +
+    '<h1>🛍️ Adiction Boutique</h1>' +
+    (message ? '<div class="alert alert-' + (message.includes('correctamente') || message.includes('exitoso') ? 'success' : 'danger') + '">' + message + '</div>' : '') +
+    '<form method="POST" action="' + scriptUrl + '">' +
+    '<div class="mb-3">' +
+    '<label class="form-label">Usuario</label>' +
+    '<input type="text" name="username" class="form-control" value="' + (attemptedUser || '') + '" required autofocus>' +
+    '</div>' +
+    '<div class="mb-3">' +
+    '<label class="form-label">Contraseña</label>' +
+    '<input type="password" name="password" class="form-control" required>' +
+    '</div>' +
+    '<button type="submit" class="btn btn-primary">Iniciar Sesión</button>' +
+    '</form>' +
+    '<div class="mt-4 text-center text-muted">' +
+    '<small><strong>Usuarios:</strong><br>admin / admin123<br>gian / gian123<br>vendedor / vendedor123</small>' +
+    '</div>' +
+    '</div>' +
+    '</body>' +
+    '</html>';
+  
+  return HtmlService.createHtmlOutput(html)
+    .setTitle('Login - Adiction Boutique')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
 /**
  * doGet - Maneja solicitudes HTTP GET
  * 
@@ -56,7 +120,100 @@ function doGet(e) {
   
   try {
     Logger.log('=== doGet START ===');
+    Logger.log('Event object e: ' + (e ? 'exists' : 'NULL'));
+    Logger.log('e.parameter: ' + (e && e.parameter ? JSON.stringify(e.parameter) : 'NULL'));
+    
+    // CRÍTICO: Validar que e y e.parameter existen
+    if (!e) {
+      Logger.log('ERROR: Event object e is null');
+      return renderLoginUserPass('', 'Error del sistema. Por favor, recargue la página.');
+    }
+    
+    if (!e.parameter) {
+      Logger.log('WARNING: e.parameter is null, inicializando como objeto vacío');
+      e.parameter = {};
+    }
+    
     Logger.log('Parameters: ' + JSON.stringify(e.parameter));
+    
+    // ========================================================================
+    // NUEVO: AUTENTICACIÓN CON USUARIO/CONTRASEÑA (FUNCIONA EN INCÓGNITO)
+    // ========================================================================
+    
+    const sessionUser = e.parameter.user;
+    const sessionToken = e.parameter.token;
+    
+    // Manejar logout
+    if (e.parameter.action === 'logout') {
+      return renderLoginUserPass('', 'Sesión cerrada correctamente');
+    }
+    
+    // Si hay sesión de usuario/contraseña, validar token
+    if (sessionUser && sessionToken) {
+      const expectedToken = generateToken(sessionUser);
+      if (sessionToken === expectedToken) {
+        Logger.log('✅ Sesión válida para usuario: ' + sessionUser);
+        
+        // Crear userData para el sistema
+        const userData = {
+          email: sessionUser + '@adictionboutique.com',
+          name: sessionUser,
+          roles: ['Admin', 'Vendedor']
+        };
+        
+        // Parsear parámetros de URL
+        const params = parseUrlParams(e.parameter);
+        const page = params.page || 'dashboard';
+        
+        Logger.log('Routing to page: ' + page);
+        
+        // Enrutar según la página solicitada
+        switch (page) {
+          case 'dashboard':
+            return renderDashboard(userData, params);
+          case 'pos':
+            return renderPOS(userData, params);
+          case 'barcode-scanner':
+            return renderBarcodeScanner(userData, params);
+          case 'inventory':
+            return renderInventory(userData, params);
+          case 'products':
+          case 'productos':
+            return renderProducts(userData, params);
+          case 'bulk-entry':
+          case 'ingreso-masivo':
+            return renderBulkProductEntry(userData, params);
+          case 'clients':
+            return renderClients(userData, params);
+          case 'cliente-form':
+            return renderClientForm(userData, params);
+          case 'collections':
+            return renderCollections(userData, params);
+          case 'cash':
+            return renderCash(userData, params);
+          case 'reports':
+            return renderReports(userData, params);
+          case 'invoices':
+            return renderInvoices(userData, params);
+          case 'producto-form':
+            return renderProductForm(userData, params);
+          case 'settings':
+            return renderSettings(userData, params);
+          case 'stalled-inventory':
+            return renderStalledInventory(userData, params);
+          case 'suppliers':
+            return renderSuppliers(userData, params);
+          case 'purchases':
+            return renderPurchases(userData, params);
+          default:
+            return renderDashboard(userData, params);
+        }
+      }
+    }
+    
+    // ========================================================================
+    // FALLBACK: AUTENTICACIÓN CON EMAIL DE GOOGLE (CÓDIGO ORIGINAL)
+    // ========================================================================
     
     // CRÍTICO: Envolver Session.getActiveUser() en try-catch
     // Si falla (múltiples cuentas, permisos, etc.), no debe romper la app
@@ -71,45 +228,83 @@ function doGet(e) {
     // Normalizar email: trim y lowercase
     if (userEmail) {
       userEmail = userEmail.trim().toLowerCase();
+      Logger.log('Email normalizado (auto): ' + userEmail);
     }
     
     // Verificar si hay un email en sesión manual (tiene prioridad)
-    if (e.parameter && e.parameter.sessionEmail) {
+    if (e.parameter.sessionEmail) {
       userEmail = e.parameter.sessionEmail.trim().toLowerCase();
       Logger.log('Usando email de sesión manual: ' + userEmail);
     }
     
-    // Manejar logout
-    if (e.parameter && e.parameter.action === 'logout') {
-      return renderLogout(userEmail);
-    }
-    
-    // Si no hay email válido, mostrar login manual
+    // Si no hay email válido, mostrar login con usuario/contraseña
     if (!userEmail || userEmail === '' || userEmail === 'unknown') {
-      Logger.log('No hay email válido, mostrando login manual');
-      return renderManualLogin('', 'Por favor, ingrese su email para acceder al sistema.');
+      Logger.log('No hay email válido, mostrando login con usuario/contraseña');
+      Logger.log('userEmail value: "' + userEmail + '"');
+      return renderLoginUserPass('', '');
     }
     
-    // Validar autenticación con AuthService - FORZAR VERIFICACIÓN SIN CACHÉ
-    Logger.log('Validando acceso para: ' + userEmail);
-    const authService = new AuthService();
-    const isAllowed = authService.isUserAllowed(userEmail, true); // true = forzar sin caché
+    Logger.log('Email final a validar: ' + userEmail);
     
-    Logger.log('Resultado de validación: ' + isAllowed);
+    // LISTA DE EMAILS PERMITIDOS HARDCODED (solución directa)
+    const allowedEmails = [
+      'gianpepex@gmail.com',
+      'karianaghostimporter@gmail.com',
+      'gianpapex@gmail.com',
+      'admin@adictionboutique.com',
+      'vendedor.mujeres@adictionboutique.com',
+      'vendedor.hombres@adictionboutique.com',
+      'cobrador@adictionboutique.com'
+    ];
+    
+    // Verificar si el email está en la lista hardcoded
+    const isInHardcodedList = allowedEmails.indexOf(userEmail) !== -1;
+    
+    Logger.log('¿Email en lista hardcoded? ' + isInHardcodedList);
+    
+    if (isInHardcodedList) {
+      // ACCESO DIRECTO - sin validar CFG_Users
+      Logger.log('✅ Usuario en lista hardcoded - ACCESO DIRECTO PERMITIDO: ' + userEmail);
+      
+      // Delegar al router directamente
+      return routeGet(e, userEmail);
+    }
+    
+    // Si no está en la lista hardcoded, validar con AuthService
+    Logger.log('Usuario no en lista hardcoded, validando con AuthService: ' + userEmail);
+    const authService = new AuthService();
+    let isAllowed = false;
+    
+    try {
+      isAllowed = authService.isUserAllowed(userEmail, true);
+    } catch (authError) {
+      Logger.log('Error en isUserAllowed: ' + authError.message);
+      isAllowed = false;
+    }
+    
+    Logger.log('Resultado de validación AuthService: ' + isAllowed);
     
     if (!isAllowed) {
       // Registrar intento de acceso fallido
-      authService.logAccess(userEmail, false);
+      try {
+        authService.logAccess(userEmail, false);
+      } catch (logError) {
+        Logger.log('Error al registrar acceso fallido: ' + logError.message);
+      }
       
       Logger.log('Usuario no autorizado: ' + userEmail);
-      return renderManualLogin(
+      return renderLoginUserPass(
         userEmail, 
-        'El email "' + userEmail + '" no está registrado en el sistema. Contacte al administrador o intente con otro email.'
+        'El email "' + userEmail + '" no está registrado. Use usuario/contraseña.'
       );
     }
     
     // Registrar acceso exitoso
-    authService.logAccess(userEmail, true);
+    try {
+      authService.logAccess(userEmail, true);
+    } catch (logError) {
+      Logger.log('Error al registrar acceso exitoso: ' + logError.message);
+    }
     Logger.log('Acceso autorizado para: ' + userEmail);
     
     // Delegar al router
@@ -121,9 +316,9 @@ function doGet(e) {
     Logger.log('User email: ' + userEmail);
     
     // NUNCA mostrar error de Google, siempre mostrar login manual
-    return renderManualLogin(
+    return renderLoginUserPass(
       userEmail, 
-      'Error del sistema al procesar su solicitud. Por favor, intente iniciar sesión manualmente.'
+      'Error del sistema: ' + error.message
     );
   }
 }
@@ -203,6 +398,43 @@ function doPost(e) {
   
   try {
     Logger.log('=== doPost START ===');
+    
+    // ========================================================================
+    // NUEVO: MANEJAR LOGIN CON USUARIO/CONTRASEÑA
+    // ========================================================================
+    
+    if (e.parameter && e.parameter.username && e.parameter.password) {
+      const username = e.parameter.username;
+      const password = e.parameter.password;
+      
+      Logger.log('Login attempt for: ' + username);
+      
+      // Validar credenciales
+      if (USERS[username] && USERS[username] === password) {
+        Logger.log('✅ Login exitoso para: ' + username);
+        
+        // Generar token
+        const token = generateToken(username);
+        
+        // Redirigir al dashboard usando doGet con parámetros
+        const scriptUrl = ScriptApp.getService().getUrl();
+        const redirectUrl = scriptUrl + '?user=' + encodeURIComponent(username) + 
+                           '&token=' + encodeURIComponent(token);
+        
+        // Retornar HTML que hace redirect inmediato
+        const html = '<html><head><meta http-equiv="refresh" content="0;url=' + redirectUrl + '"></head><body>Redirigiendo...</body></html>';
+        
+        return HtmlService.createHtmlOutput(html)
+          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+      } else {
+        Logger.log('❌ Login fallido para: ' + username);
+        return renderLoginUserPass(username, 'Usuario o contraseña incorrectos');
+      }
+    }
+    
+    // ========================================================================
+    // CÓDIGO ORIGINAL PARA API
+    // ========================================================================
     
     // CRÍTICO: Envolver Session.getActiveUser() en try-catch
     try {
@@ -327,7 +559,20 @@ function routeGet(e, userEmail) {
   
   // Obtener datos del usuario para pasar al layout
   const authService = new AuthService();
-  const userRoles = authService.getUserRoles(userEmail);
+  let userRoles = [];
+  
+  try {
+    userRoles = authService.getUserRoles(userEmail);
+  } catch (roleError) {
+    Logger.log('Error al obtener roles: ' + roleError.message);
+    userRoles = [];
+  }
+  
+  // Si no tiene roles (usuario hardcoded o error), asignar roles por defecto
+  if (userRoles.length === 0) {
+    Logger.log('Usuario sin roles en CFG_Users, asignando roles por defecto');
+    userRoles = ['Admin', 'Vendedor'];
+  }
   
   const userData = {
     email: userEmail,
@@ -381,6 +626,15 @@ function routeGet(e, userEmail) {
     case 'settings':
       return renderSettings(userData, params);
       
+    case 'stalled-inventory':
+      return renderStalledInventory(userData, params);
+      
+    case 'suppliers':
+      return renderSuppliers(userData, params);
+      
+    case 'purchases':
+      return renderPurchases(userData, params);
+      
     default:
       // Página no encontrada - redirigir a dashboard
       Logger.log('Page not found: ' + page + ', redirecting to dashboard');
@@ -421,6 +675,19 @@ function routePost(requestData, userEmail) {
     else if (action === 'getDashboardData') {
       // getDashboardData ya retorna createSuccessResponse, retornar directamente
       return getDashboardData();
+    }
+    // Stalled Inventory
+    else if (action === 'getStalledInventory') {
+      return getStalledInventory();
+    }
+    else if (action === 'applyStalledDiscount') {
+      return applyStalledDiscount(payload.productId, payload.discountPercent, payload.newPrice);
+    }
+    else if (action === 'transferStalledProduct') {
+      return transferStalledProduct(payload.productId, payload.destination, payload.quantity, payload.notes);
+    }
+    else if (action === 'markForLiquidation') {
+      return markForLiquidation(payload.productId);
     }
     // System Settings
     else if (action === 'getSystemSettings') {
@@ -802,6 +1069,107 @@ function handleClientAction(action, payload, userEmail) {
       }
       
       return clientRepo.search(payload.query);
+    }
+    
+    // Crear cliente
+    else if (action === 'createClient' || action === 'client/create') {
+      if (!payload) {
+        throw new Error('Datos del cliente son requeridos');
+      }
+      
+      // Validar campos requeridos
+      if (!payload.dni || !payload.name || !payload.phone) {
+        throw new Error('DNI, nombre y teléfono son requeridos');
+      }
+      
+      // Verificar que el DNI no exista
+      const existingClient = clientRepo.findByDNI(payload.dni);
+      if (existingClient) {
+        throw new Error('Ya existe un cliente con ese DNI');
+      }
+      
+      // Preparar datos del cliente
+      const clientData = {
+        dni: payload.dni,
+        name: payload.name,
+        phone: payload.phone,
+        email: payload.email || '',
+        address: payload.address || '',
+        lat: payload.lat || null,
+        lng: payload.lng || null,
+        credit_limit: parseFloat(payload.credit_limit) || 0,
+        credit_used: 0,
+        dni_photo_url: payload.dni_photo_url || '',
+        birthday: payload.birthday ? new Date(payload.birthday) : null,
+        active: payload.active !== undefined ? payload.active : true
+      };
+      
+      const newClient = clientRepo.create(clientData);
+      
+      // Auditar creación
+      const auditRepo = new AuditRepository();
+      auditRepo.log(
+        'CREATE_CLIENT',
+        'CLIENT',
+        newClient.id,
+        {},
+        newClient,
+        userEmail
+      );
+      
+      return newClient;
+    }
+    
+    // Actualizar cliente
+    else if (action === 'updateClient' || action === 'client/update') {
+      if (!payload || !payload.id) {
+        throw new Error('ID del cliente es requerido');
+      }
+      
+      // Obtener cliente actual
+      const currentClient = clientRepo.findById(payload.id);
+      if (!currentClient) {
+        throw new Error('Cliente no encontrado');
+      }
+      
+      // Si se está cambiando el DNI, verificar que no exista
+      if (payload.dni && payload.dni !== currentClient.dni) {
+        const existingClient = clientRepo.findByDNI(payload.dni);
+        if (existingClient) {
+          throw new Error('Ya existe un cliente con ese DNI');
+        }
+      }
+      
+      // Preparar datos actualizados
+      const updateData = {
+        dni: payload.dni || currentClient.dni,
+        name: payload.name || currentClient.name,
+        phone: payload.phone || currentClient.phone,
+        email: payload.email !== undefined ? payload.email : currentClient.email,
+        address: payload.address !== undefined ? payload.address : currentClient.address,
+        lat: payload.lat !== undefined ? payload.lat : currentClient.lat,
+        lng: payload.lng !== undefined ? payload.lng : currentClient.lng,
+        credit_limit: payload.credit_limit !== undefined ? parseFloat(payload.credit_limit) : currentClient.credit_limit,
+        credit_used: currentClient.credit_used, // No se modifica manualmente
+        dni_photo_url: payload.dni_photo_url !== undefined ? payload.dni_photo_url : currentClient.dni_photo_url,
+        birthday: payload.birthday !== undefined ? (payload.birthday ? new Date(payload.birthday) : null) : currentClient.birthday,
+        active: payload.active !== undefined ? payload.active : currentClient.active
+      };
+      
+      const updatedClient = clientRepo.update(payload.id, updateData);
+      
+      // Auditar actualización
+      const auditRepo = new AuditRepository();
+      auditRepo.log(
+        'UPDATE_CLIENT',
+        'CLIENT',
+        payload.id,
+        currentClient,
+        updatedClient,
+        userEmail
+      );
+      
+      return updatedClient;
     }
     
     // Acción no reconocida
@@ -1225,6 +1593,27 @@ function renderSettings(userData, params) {
 }
 
 /**
+ * renderStalledInventory - Renderiza la página de mercadería estancada
+ */
+function renderStalledInventory(userData, params) {
+  return renderBasePage(userData, 'stalled-inventory');
+}
+
+/**
+ * renderSuppliers - Renderiza la página de proveedores
+ */
+function renderSuppliers(userData, params) {
+  return renderBasePage(userData, 'suppliers');
+}
+
+/**
+ * renderPurchases - Renderiza la página de compras
+ */
+function renderPurchases(userData, params) {
+  return renderBasePage(userData, 'purchases');
+}
+
+/**
  * renderProductForm - Renderiza el formulario de producto
  */
 function renderProductForm(userData, params) {
@@ -1353,7 +1742,7 @@ function renderManualLogin(attemptedEmail, errorMessage) {
             <label for="email" class="form-label">Email</label>
             <input type="email" class="form-control" id="email" name="email" 
                    placeholder="Ingrese su email" required
-                   value="${attemptedEmail || 'gianpapex@gmail.com'}">
+                   value="${attemptedEmail || ''}">
           </div>
           
           <button type="submit" class="btn btn-primary">
@@ -1371,7 +1760,8 @@ function renderManualLogin(attemptedEmail, errorMessage) {
         <div class="info-box">
           <strong><i class="bi bi-info-circle"></i> Usuarios Autorizados:</strong>
           <ul class="mb-0 mt-2">
-            <li>gianpapex@gmail.com</li>
+            <li>gianpepex@gmail.com</li>
+            <li>karianaghostimporter@gmail.com</li>
             <li>admin@adictionboutique.com</li>
             <li>vendedor.mujeres@adictionboutique.com</li>
             <li>vendedor.hombres@adictionboutique.com</li>
@@ -2108,7 +2498,7 @@ function createSale(saleData, requestId) {
  * @returns {Object} Reporte de inventario con safeResponse
  */
 function getInventoryReport(warehouseId) {
-  try {
+  return wrapResponse(function() {
     Logger.log('=== getInventoryReport START ===');
     Logger.log('Warehouse ID: ' + (warehouseId || 'Todos'));
     
@@ -2178,29 +2568,21 @@ function getInventoryReport(warehouseId) {
     Logger.log('Stock bajo: ' + lowStockCount);
     Logger.log('=== getInventoryReport END ===');
     
-    // CRÍTICO: Usar createSuccessResponse para convertir fechas automáticamente
-    return createSuccessResponse(report);
-    
-  } catch (error) {
-    Logger.log('ERROR en getInventoryReport: ' + error.message);
-    Logger.log('Stack trace: ' + error.stack);
-    
-    return createErrorResponse(
-      'INVENTORY_ERROR',
-      'Error al generar reporte de inventario',
-      { originalError: error.message }
-    );
-  }
+    return report;
+  });
 }
 
 
 /**
  * getDashboardData - Obtiene datos para el dashboard
  * 
+ * ACTUALIZADO: Usa wrapResponse para manejo robusto de errores
+ * Requisitos: 31.2, 31.3
+ * 
  * @returns {Object} Respuesta con datos del dashboard
  */
 function getDashboardData() {
-  try {
+  return wrapResponse(function() {
     Logger.log('=== getDashboardData START ===');
     
     // Obtener fecha de hoy
@@ -2366,21 +2748,255 @@ function getDashboardData() {
       // Continuar con valores por defecto
     }
     
+    // 5. Mercadería estancada (más de 180 días)
+    try {
+      Logger.log('Calculando mercadería estancada...');
+      const productRepo = new ProductRepository();
+      const allProducts = productRepo.findAll();
+      
+      const stalledThresholdDays = 180;
+      const stalledThresholdDate = new Date(today);
+      stalledThresholdDate.setDate(stalledThresholdDate.getDate() - stalledThresholdDays);
+      
+      let stalledCount = 0;
+      
+      for (let i = 0; i < allProducts.length; i++) {
+        const product = allProducts[i];
+        
+        // Verificar si tiene entry_date
+        if (product.entry_date) {
+          let entryDate = product.entry_date;
+          if (typeof entryDate === 'string') {
+            entryDate = new Date(entryDate);
+          }
+          
+          // Si la fecha de entrada es anterior al umbral, está estancado
+          if (entryDate < stalledThresholdDate) {
+            stalledCount++;
+          }
+        }
+      }
+      
+      dashboardData.stalledInventoryCount = stalledCount;
+      
+      Logger.log('Mercadería estancada (>180 días): ' + stalledCount);
+    } catch (e) {
+      Logger.log('Error al calcular mercadería estancada: ' + e.message);
+      dashboardData.stalledInventoryCount = 0;
+    }
+    
     Logger.log('=== getDashboardData END ===');
     
-    // CRÍTICO: Usar safeResponse para convertir todas las fechas a strings
-    return createSuccessResponse(dashboardData);
+    // wrapResponse se encarga de normalizar fechas automáticamente
+    return dashboardData;
+  });
+}
+
+
+/**
+ * getStalledInventory - Obtiene productos con más de 180 días en inventario
+ * 
+ * @returns {Object} Respuesta con lista de productos estancados
+ */
+function getStalledInventory() {
+  return wrapResponse(function() {
+    Logger.log('=== getStalledInventory START ===');
     
-  } catch (error) {
-    Logger.log('ERROR CRÍTICO en getDashboardData: ' + error.message);
-    Logger.log('Stack trace: ' + error.stack);
+    const productRepo = new ProductRepository();
+    const allProducts = productRepo.findAll();
     
-    return createErrorResponse(
-      'DASHBOARD_ERROR',
-      'Error al obtener datos del dashboard',
-      { originalError: error.message }
+    const today = new Date();
+    const stalledThresholdDays = 180;
+    const stalledThresholdDate = new Date(today);
+    stalledThresholdDate.setDate(stalledThresholdDate.getDate() - stalledThresholdDays);
+    
+    const stalledProducts = [];
+    
+    for (let i = 0; i < allProducts.length; i++) {
+      const product = allProducts[i];
+      
+      // Verificar si tiene entry_date y stock > 0
+      if (product.entry_date && (product.stock > 0 || !product.stock)) {
+        let entryDate = product.entry_date;
+        if (typeof entryDate === 'string') {
+          entryDate = new Date(entryDate);
+        }
+        
+        // Si la fecha de entrada es anterior al umbral, está estancado
+        if (entryDate < stalledThresholdDate) {
+          stalledProducts.push({
+            id: product.id,
+            name: product.name,
+            size: product.size,
+            entry_date: entryDate,
+            purchase_price: product.purchase_price,
+            sale_price: product.sale_price,
+            stock: product.stock || 0,
+            category: product.category,
+            supplier: product.supplier
+          });
+        }
+      }
+    }
+    
+    Logger.log('Productos estancados encontrados: ' + stalledProducts.length);
+    Logger.log('=== getStalledInventory END ===');
+    
+    return stalledProducts;
+  });
+}
+
+
+/**
+ * applyStalledDiscount - Aplica descuento a producto estancado
+ * 
+ * @param {string} productId - ID del producto
+ * @param {number} discountPercent - Porcentaje de descuento
+ * @param {number} newPrice - Nuevo precio de venta
+ * @returns {Object} Respuesta con resultado
+ */
+function applyStalledDiscount(productId, discountPercent, newPrice) {
+  return wrapResponse(function() {
+    Logger.log('=== applyStalledDiscount START ===');
+    Logger.log('Product ID: ' + productId);
+    Logger.log('Discount: ' + discountPercent + '%');
+    Logger.log('New Price: ' + newPrice);
+    
+    const productRepo = new ProductRepository();
+    const product = productRepo.findById(productId);
+    
+    if (!product) {
+      throw new Error('Producto no encontrado');
+    }
+    
+    const oldPrice = product.sale_price;
+    
+    // Actualizar precio
+    product.sale_price = newPrice;
+    productRepo.update(product);
+    
+    // Registrar en auditoría
+    const auditService = new AuditService();
+    auditService.logAction(
+      'STALLED_DISCOUNT',
+      'PRODUCT',
+      productId,
+      { sale_price: oldPrice },
+      { sale_price: newPrice, discount_percent: discountPercent },
+      Session.getActiveUser().getEmail()
     );
-  }
+    
+    Logger.log('Descuento aplicado exitosamente');
+    Logger.log('=== applyStalledDiscount END ===');
+    
+    return { productId: productId, newPrice: newPrice };
+  });
+}
+
+
+/**
+ * transferStalledProduct - Registra transferencia de producto estancado
+ * 
+ * @param {string} productId - ID del producto
+ * @param {string} destination - Destino de la transferencia
+ * @param {number} quantity - Cantidad a transferir
+ * @param {string} notes - Notas adicionales
+ * @returns {Object} Respuesta con resultado
+ */
+function transferStalledProduct(productId, destination, quantity, notes) {
+  return wrapResponse(function() {
+    Logger.log('=== transferStalledProduct START ===');
+    Logger.log('Product ID: ' + productId);
+    Logger.log('Destination: ' + destination);
+    Logger.log('Quantity: ' + quantity);
+    
+    const productRepo = new ProductRepository();
+    const product = productRepo.findById(productId);
+    
+    if (!product) {
+      throw new Error('Producto no encontrado');
+    }
+    
+    if (quantity > product.stock) {
+      throw new Error('Cantidad insuficiente en stock');
+    }
+    
+    // Decrementar stock
+    product.stock = (product.stock || 0) - quantity;
+    productRepo.update(product);
+    
+    // Registrar movimiento
+    const movementRepo = new MovementRepository();
+    const movement = {
+      id: Utilities.getUuid(),
+      product_id: productId,
+      product_name: product.name,
+      movement_type: 'TRANSFER_OUT',
+      quantity: quantity,
+      movement_date: new Date(),
+      notes: 'Transferencia a ' + destination + (notes ? ': ' + notes : ''),
+      user_email: Session.getActiveUser().getEmail()
+    };
+    movementRepo.create(movement);
+    
+    // Registrar en auditoría
+    const auditService = new AuditService();
+    auditService.logAction(
+      'STALLED_TRANSFER',
+      'PRODUCT',
+      productId,
+      { stock: (product.stock || 0) + quantity },
+      { stock: product.stock, destination: destination },
+      Session.getActiveUser().getEmail()
+    );
+    
+    Logger.log('Transferencia registrada exitosamente');
+    Logger.log('=== transferStalledProduct END ===');
+    
+    return { productId: productId, destination: destination, quantity: quantity };
+  });
+}
+
+
+/**
+ * markForLiquidation - Marca producto para liquidación
+ * 
+ * @param {string} productId - ID del producto
+ * @returns {Object} Respuesta con resultado
+ */
+function markForLiquidation(productId) {
+  return wrapResponse(function() {
+    Logger.log('=== markForLiquidation START ===');
+    Logger.log('Product ID: ' + productId);
+    
+    const productRepo = new ProductRepository();
+    const product = productRepo.findById(productId);
+    
+    if (!product) {
+      throw new Error('Producto no encontrado');
+    }
+    
+    // Agregar etiqueta de liquidación (si no existe el campo, lo creamos)
+    const oldStatus = product.liquidation_status || 'NORMAL';
+    product.liquidation_status = 'LIQUIDATION';
+    productRepo.update(product);
+    
+    // Registrar en auditoría
+    const auditService = new AuditService();
+    auditService.logAction(
+      'MARK_LIQUIDATION',
+      'PRODUCT',
+      productId,
+      { liquidation_status: oldStatus },
+      { liquidation_status: 'LIQUIDATION' },
+      Session.getActiveUser().getEmail()
+    );
+    
+    Logger.log('Producto marcado para liquidación');
+    Logger.log('=== markForLiquidation END ===');
+    
+    return { productId: productId, status: 'LIQUIDATION' };
+  });
 }
 
 
@@ -2390,7 +3006,7 @@ function getDashboardData() {
  * @returns {Object} Respuesta con lista de clientes
  */
 function getClients() {
-  try {
+  return wrapResponse(function() {
     const clientRepo = new ClientRepository();
     const clients = clientRepo.findAll();
     
@@ -2399,17 +3015,8 @@ function getClients() {
       return client.active === true || client.active === 'TRUE';
     });
     
-    // CRÍTICO: Usar safeResponse para convertir todas las fechas a strings
-    return createSuccessResponse(activeClients);
-    
-  } catch (error) {
-    Logger.log('Error in getClients: ' + error.message);
-    return createErrorResponse(
-      'CLIENTS_ERROR',
-      'Error al obtener clientes',
-      { originalError: error.message }
-    );
-  }
+    return activeClients;
+  });
 }
 
 
@@ -2420,24 +3027,14 @@ function getClients() {
  * @returns {Object} Respuesta con HTML del ticket
  */
 function generateTicket(saleId) {
-  try {
+  return wrapResponse(function() {
     const posService = new POSService();
     const ticketHtml = posService.generateTicket(saleId);
     
     return {
-      success: true,
-      data: {
-        html: ticketHtml
-      }
+      html: ticketHtml
     };
-    
-  } catch (error) {
-    Logger.log('Error in generateTicket: ' + error.message);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
+  });
 }
 
 
@@ -2450,22 +3047,12 @@ function generateTicket(saleId) {
  * @returns {Object} Respuesta con resultado de anulación
  */
 function voidSale(saleId, reason, userId) {
-  try {
+  return wrapResponse(function() {
     const posService = new POSService();
     const result = posService.voidSale(saleId, reason, userId);
     
-    return {
-      success: true,
-      data: result
-    };
-    
-  } catch (error) {
-    Logger.log('Error in voidSale: ' + error.message);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
+    return result;
+  });
 }
 
 // ============================================================================
@@ -2487,7 +3074,11 @@ function voidSale(saleId, reason, userId) {
 function include(filename) {
   try {
     Logger.log('Intentando incluir archivo: ' + filename);
-    let content = HtmlService.createHtmlOutputFromFile(filename).getContent();
+    
+    // CRÍTICO: Usar createTemplateFromFile para evaluar variables del servidor
+    // Esto permite que <?= scriptUrl ?> y otras variables funcionen en archivos incluidos
+    const template = HtmlService.createTemplateFromFile(filename);
+    let content = template.evaluate().getContent();
     
     // Extraer solo el contenido del body para evitar conflictos
     // Buscar <body> y </body>
@@ -2564,7 +3155,7 @@ function include(filename) {
  * @returns {Object} Respuesta con parámetros del sistema
  */
 function getSystemSettings() {
-  try {
+  return wrapResponse(function() {
     Logger.log('=== getSystemSettings START ===');
     
     const ss = getActiveSpreadsheet();
@@ -2604,18 +3195,8 @@ function getSystemSettings() {
     Logger.log('Parámetros cargados: ' + Object.keys(settings).length);
     Logger.log('=== getSystemSettings END ===');
     
-    return createSuccessResponse(settings);
-    
-  } catch (error) {
-    Logger.log('ERROR en getSystemSettings: ' + error.message);
-    Logger.log('Stack trace: ' + error.stack);
-    
-    return createErrorResponse(
-      'SETTINGS_ERROR',
-      'Error al obtener configuración del sistema',
-      { originalError: error.message }
-    );
-  }
+    return settings;
+  });
 }
 
 /**
@@ -2745,4 +3326,207 @@ function updateSystemSettings(payload, userEmail) {
       { originalError: error.message }
     );
   }
+}
+
+
+/**
+ * getClientById - Obtiene un cliente por ID (wrapper para frontend)
+ * 
+ * @param {string} clientId - ID del cliente
+ * @returns {Object} Respuesta con datos del cliente
+ */
+function getClientById(clientId) {
+  return wrapResponse(function() {
+    const clientRepo = new ClientRepository();
+    const client = clientRepo.findById(clientId);
+    
+    if (!client) {
+      throw new Error('Cliente no encontrado');
+    }
+    
+    return client;
+  });
+}
+
+/**
+ * createClient - Crea un nuevo cliente (wrapper para frontend)
+ * 
+ * @param {Object} clientData - Datos del cliente
+ * @returns {Object} Respuesta con cliente creado
+ */
+function createClient(clientData) {
+  return wrapResponse(function() {
+    const session = Session.getActiveUser().getEmail();
+    return handleClientAction('createClient', clientData, session);
+  });
+}
+
+/**
+ * updateClient - Actualiza un cliente existente (wrapper para frontend)
+ * 
+ * @param {Object} clientData - Datos del cliente (debe incluir id)
+ * @returns {Object} Respuesta con cliente actualizado
+ */
+function updateClient(clientData) {
+  return wrapResponse(function() {
+    const session = Session.getActiveUser().getEmail();
+    return handleClientAction('updateClient', clientData, session);
+  });
+}
+
+
+// ============================================================================
+// FUNCIONES PARA PROVEEDORES
+// ============================================================================
+
+/**
+ * getSuppliers - Obtiene lista de proveedores
+ * 
+ * @returns {Object} Respuesta con lista de proveedores
+ */
+function getSuppliers() {
+  return wrapResponse(function() {
+    Logger.log('=== getSuppliers START ===');
+    
+    const supplierRepo = new SupplierRepository();
+    const suppliers = supplierRepo.findAll();
+    
+    Logger.log('Proveedores obtenidos: ' + suppliers.length);
+    Logger.log('=== getSuppliers END ===');
+    
+    return suppliers;
+  });
+}
+
+/**
+ * getSupplier - Obtiene un proveedor por ID
+ * 
+ * @param {string} supplierId - ID del proveedor
+ * @returns {Object} Respuesta con datos del proveedor
+ */
+function getSupplier(supplierId) {
+  return wrapResponse(function() {
+    Logger.log('=== getSupplier START ===');
+    Logger.log('Supplier ID: ' + supplierId);
+    
+    if (!supplierId) {
+      throw new Error('ID de proveedor es requerido');
+    }
+    
+    const supplierRepo = new SupplierRepository();
+    const supplier = supplierRepo.findById(supplierId);
+    
+    if (!supplier) {
+      throw new Error('Proveedor no encontrado');
+    }
+    
+    Logger.log('Proveedor encontrado: ' + supplier.name);
+    Logger.log('=== getSupplier END ===');
+    
+    return supplier;
+  });
+}
+
+/**
+ * createSupplier - Crea un nuevo proveedor
+ * 
+ * @param {Object} supplierData - Datos del proveedor
+ * @returns {Object} Respuesta con proveedor creado
+ */
+function createSupplier(supplierData) {
+  return wrapResponse(function() {
+    Logger.log('=== createSupplier START ===');
+    Logger.log('Supplier data: ' + JSON.stringify(supplierData));
+    
+    // Validar campos requeridos
+    if (!supplierData.code || !supplierData.name) {
+      throw new Error('Código y nombre son requeridos');
+    }
+    
+    const supplierRepo = new SupplierRepository();
+    
+    // Verificar que el código no exista
+    const existing = supplierRepo.findByCode(supplierData.code);
+    if (existing) {
+      throw new Error('Ya existe un proveedor con ese código');
+    }
+    
+    // Generar ID
+    supplierData.id = 'sup-' + new Date().getTime() + '-' + Math.random().toString(36).substr(2, 9);
+    supplierData.created_at = new Date();
+    supplierData.updated_at = new Date();
+    
+    const newSupplier = supplierRepo.create(supplierData);
+    
+    Logger.log('Proveedor creado: ' + newSupplier.id);
+    Logger.log('=== createSupplier END ===');
+    
+    return newSupplier;
+  });
+}
+
+/**
+ * updateSupplier - Actualiza un proveedor existente
+ * 
+ * @param {Object} supplierData - Datos del proveedor (debe incluir id)
+ * @returns {Object} Respuesta con proveedor actualizado
+ */
+function updateSupplier(supplierData) {
+  return wrapResponse(function() {
+    Logger.log('=== updateSupplier START ===');
+    Logger.log('Supplier data: ' + JSON.stringify(supplierData));
+    
+    if (!supplierData.id) {
+      throw new Error('ID de proveedor es requerido');
+    }
+    
+    const supplierRepo = new SupplierRepository();
+    
+    // Verificar que existe
+    const existing = supplierRepo.findById(supplierData.id);
+    if (!existing) {
+      throw new Error('Proveedor no encontrado');
+    }
+    
+    // Si cambió el código, verificar que no exista
+    if (supplierData.code && supplierData.code !== existing.code) {
+      const duplicate = supplierRepo.findByCode(supplierData.code);
+      if (duplicate && duplicate.id !== supplierData.id) {
+        throw new Error('Ya existe otro proveedor con ese código');
+      }
+    }
+    
+    supplierData.updated_at = new Date();
+    
+    const updatedSupplier = supplierRepo.update(supplierData.id, supplierData);
+    
+    Logger.log('Proveedor actualizado: ' + updatedSupplier.id);
+    Logger.log('=== updateSupplier END ===');
+    
+    return updatedSupplier;
+  });
+}
+
+// ============================================================================
+// FUNCIONES PARA COMPRAS
+// ============================================================================
+
+/**
+ * getPurchases - Obtiene lista de compras
+ * 
+ * @param {Object} filters - Filtros opcionales (dateFrom, dateTo, supplierId)
+ * @returns {Object} Respuesta con lista de compras
+ */
+function getPurchases(filters) {
+  return wrapResponse(function() {
+    Logger.log('=== getPurchases START ===');
+    Logger.log('Filters: ' + JSON.stringify(filters));
+    
+    // Por ahora retornar array vacío ya que no tenemos la tabla de compras implementada
+    // TODO: Implementar cuando se cree la tabla PUR_Purchases
+    Logger.log('Funcionalidad de compras pendiente de implementación');
+    Logger.log('=== getPurchases END ===');
+    
+    return [];
+  });
 }

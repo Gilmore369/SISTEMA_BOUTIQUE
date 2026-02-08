@@ -752,7 +752,7 @@ class InventoryService {
       }
       
       // Validar tipo de movimiento
-      const validTypes = ['ENTRADA', 'SALIDA', 'AJUSTE', 'TRANSFERENCIA_OUT', 'TRANSFERENCIA_IN'];
+      const validTypes = ['ENTRADA', 'SALIDA', 'AJUSTE', 'TRANSFERENCIA_OUT', 'TRANSFERENCIA_IN', 'GIFT_BIRTHDAY'];
       if (validTypes.indexOf(movementData.type) === -1) {
         throw new Error('type debe ser uno de: ' + validTypes.join(', '));
       }
@@ -4254,33 +4254,19 @@ function testInvoiceService() {
  * @returns {Object} Respuesta con array de facturas
  */
 function getAllInvoices() {
-  try {
+  return wrapResponse(function() {
     const invoiceService = new InvoiceService();
     
     // Si no existe el repositorio, retornar array vacío
     if (!invoiceService.invoiceRepo) {
-      return {
-        success: true,
-        data: [],
-        message: 'No hay facturas registradas'
-      };
+      return [];
     }
     
     // Obtener todas las facturas
     const invoices = invoiceService.invoiceRepo.findAll();
     
-    return {
-      success: true,
-      data: invoices
-    };
-    
-  } catch (error) {
-    Logger.log('Error en getAllInvoices: ' + error.message);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
+    return invoices;
+  });
 }
 
 /**
@@ -4290,7 +4276,7 @@ function getAllInvoices() {
  * @returns {Object} Respuesta con URL del PDF
  */
 function getInvoicePDFUrl(invoiceId) {
-  try {
+  return wrapResponse(function() {
     const invoiceService = new InvoiceService();
     
     if (!invoiceService.invoiceRepo) {
@@ -4308,17 +4294,9 @@ function getInvoicePDFUrl(invoiceId) {
     }
     
     return {
-      success: true,
       pdfUrl: invoice.pdf_url
     };
-    
-  } catch (error) {
-    Logger.log('Error en getInvoicePDFUrl: ' + error.message);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
+  });
 }
 
 /**
@@ -4329,20 +4307,13 @@ function getInvoicePDFUrl(invoiceId) {
  * @returns {Object} Respuesta del envío
  */
 function resendInvoiceByEmail(invoiceId, email) {
-  try {
+  return wrapResponse(function() {
     const invoiceService = new InvoiceService();
     
     const result = invoiceService.sendInvoiceByEmail(invoiceId, email);
     
     return result;
-    
-  } catch (error) {
-    Logger.log('Error en resendInvoiceByEmail: ' + error.message);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
+  });
 }
 
 
@@ -4353,23 +4324,13 @@ function resendInvoiceByEmail(invoiceId, email) {
  * @returns {Object} Respuesta con factura generada
  */
 function generateInvoiceForSale(saleId) {
-  try {
+  return wrapResponse(function() {
     const invoiceService = new InvoiceService();
     
     const invoice = invoiceService.generateInvoice(saleId);
     
-    return {
-      success: true,
-      data: invoice
-    };
-    
-  } catch (error) {
-    Logger.log('Error en generateInvoiceForSale: ' + error.message);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
+    return invoice;
+  });
 }
 
 /**
@@ -4380,20 +4341,13 @@ function generateInvoiceForSale(saleId) {
  * @returns {Object} Respuesta del envío
  */
 function sendInvoiceEmail(invoiceId, email) {
-  try {
+  return wrapResponse(function() {
     const invoiceService = new InvoiceService();
     
     const result = invoiceService.sendInvoiceByEmail(invoiceId, email);
     
     return result;
-    
-  } catch (error) {
-    Logger.log('Error en sendInvoiceEmail: ' + error.message);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
+  });
 }
 
 
@@ -4404,7 +4358,7 @@ function sendInvoiceEmail(invoiceId, email) {
  * @returns {Object} Respuesta con array de entradas de auditoría
  */
 function getAuditLog(filters) {
-  try {
+  return wrapResponse(function() {
     const auditRepo = new AuditRepository();
     
     // Preparar filtros
@@ -4436,18 +4390,8 @@ function getAuditLog(filters) {
     // Obtener entradas de auditoría
     const entries = auditRepo.findByFilters(queryFilters);
     
-    return {
-      success: true,
-      data: entries
-    };
-    
-  } catch (error) {
-    Logger.log('Error en getAuditLog: ' + error.message);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
+    return entries;
+  });
 }
 
 
@@ -4807,4 +4751,543 @@ function handleBulkProductAction(action, payload) {
       null
     );
   }
+}
+
+
+// ============================================================================
+// FUNCIONES EXPUESTAS PARA FRONTEND
+// ============================================================================
+
+/**
+ * createBulkProductsFromFrontend - Función expuesta para el frontend
+ * 
+ * Wrapper para llamar a BulkProductService.createBulkProducts desde el frontend
+ * 
+ * @param {Object} data - Datos de la solicitud
+
+/**
+// FUNCIONES EXPUESTAS PARA FRONTEND
+// ============================================================================
+
+/**
+ * createBulkProductsFromFrontend - Función expuesta para el frontend
+ * 
+ * Wrapper para llamar a BulkProductService.createBulkProducts desde el frontend
+ * 
+ * @param {Object} data - Datos de la solicitud
+ * @returns {Object} Respuesta con wrapResponse
+ */
+function createBulkProductsFromFrontend(data) {
+  return wrapResponse(function() {
+    const bulkService = new BulkProductService();
+    
+    return bulkService.createBulkProducts(
+      data.baseProduct,
+      data.sizeDistribution,
+      data.purchasePrice,
+      data.warehouseId,
+      data.userId
+    );
+  });
+}
+
+// ============================================================================
+// FUNCIONES DE PRUEBA
+// ============================================================================
+
+/**
+ * testBulkProductService - Prueba el servicio de ingreso masivo
+ */
+function testBulkProductService() {
+  Logger.log('=== Iniciando pruebas de BulkProductService ===');
+  
+  try {
+    const bulkService = new BulkProductService();
+    
+    // Test 1: Parsear distribución de tallas
+    Logger.log('\n1. Probando _parseSizeDistribution...');
+    const distribution = '2S, 3M, 4L, 1XL';
+    const parsed = bulkService._parseSizeDistribution(distribution);
+    
+    Logger.log('✓ Distribución parseada:');
+    for (let i = 0; i < parsed.length; i++) {
+      Logger.log('  - ' + parsed[i].quantity + ' x ' + parsed[i].sizeCode);
+    }
+    
+    // Test 2: Validar tallas
+    Logger.log('\n2. Probando _validateSizes...');
+    bulkService._validateSizes(parsed);
+    Logger.log('✓ Todas las tallas son válidas');
+    
+    // Test 3: Generar código de barras
+    Logger.log('\n3. Probando _generateBarcode...');
+    const baseProduct = { name: 'Blusa Test' };
+    const barcode = bulkService._generateBarcode(baseProduct, 'M', 0, 0);
+    Logger.log('✓ Código de barras generado: ' + barcode);
+    
+    // Test 4: Crear productos masivos (comentado para no crear datos reales)
+    Logger.log('\n4. Test de creación masiva (simulado)');
+    Logger.log('⚠ Para probar la creación real, descomentar el código');
+    
+    /*
+    const result = bulkService.createBulkProducts(
+      {
+        name: 'Blusa Test Ingreso Masivo',
+        line_id: 'line-001',
+        category_id: 'cat-001',
+        brand_id: 'brand-001',
+        price: 50.00,
+        description: 'Blusa de prueba para ingreso masivo'
+      },
+      '2S, 2M, 2L',
+      30.00,
+      'warehouse-001',
+      'test@example.com'
+    );
+    
+    Logger.log('✓ Productos creados: ' + result.productsCreated);
+    */
+    
+    Logger.log('\n=== Pruebas de BulkProductService completadas ===');
+    
+    return {
+      success: true,
+      message: 'Todas las pruebas pasaron'
+    };
+    
+  } catch (error) {
+    Logger.log('\n✗ Error en las pruebas: ' + error.message);
+    Logger.log('Stack trace: ' + error.stack);
+    
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+
+// ============================================================================
+// BIRTHDAYSERVICE - Detección de Cumpleaños
+// ============================================================================
+
+/**
+ * BirthdayService - Servicio para detección de cumpleaños
+ * 
+ * Gestiona la detección de cumpleaños de clientes para aplicar
+ * descuentos y obsequios especiales.
+ * 
+ * Requisitos: 35.1, 35.2
+ * 
+ * @class
+ */
+class BirthdayService {
+  
+  /**
+   * Constructor
+   */
+  constructor() {
+    this.clientRepo = new ClientRepository();
+  }
+  
+  /**
+   * checkBirthday - Verifica si hoy es el cumpleaños del cliente
+   * 
+   * Compara la fecha actual (día y mes) con la fecha de cumpleaños
+   * del cliente. Ignora el año para detectar cumpleaños anual.
+   * 
+   * Requisitos: 35.1, 35.2
+   * 
+   * @param {string} clientId - ID del cliente
+   * @returns {Object} Objeto con {isBirthday: boolean, client: Object}
+   * @throws {Error} Si el cliente no existe
+   */
+  checkBirthday(clientId) {
+    try {
+      Logger.log('=== checkBirthday START ===');
+      Logger.log('Client ID: ' + clientId);
+      
+      // Validar parámetro
+      if (!clientId) {
+        throw new Error('ID de cliente es requerido');
+      }
+      
+      // Obtener cliente
+      const client = this.clientRepo.findById(clientId);
+      
+      if (!client) {
+        throw new Error('Cliente no encontrado');
+      }
+      
+      // Si el cliente no tiene fecha de cumpleaños, retornar false
+      if (!client.birthday) {
+        Logger.log('Cliente no tiene fecha de cumpleaños registrada');
+        return {
+          isBirthday: false,
+          client: client,
+          message: 'Cliente no tiene fecha de cumpleaños registrada'
+        };
+      }
+      
+      // Obtener fecha actual
+      const today = new Date();
+      const todayDay = today.getDate();
+      const todayMonth = today.getMonth(); // 0-11
+      
+      // Convertir birthday a Date si es string
+      let birthdayDate = client.birthday;
+      if (typeof birthdayDate === 'string') {
+        birthdayDate = new Date(birthdayDate);
+      }
+      
+      // Validar que sea una fecha válida
+      if (isNaN(birthdayDate.getTime())) {
+        Logger.log('Fecha de cumpleaños inválida');
+        return {
+          isBirthday: false,
+          client: client,
+          message: 'Fecha de cumpleaños inválida'
+        };
+      }
+      
+      const birthdayDay = birthdayDate.getDate();
+      const birthdayMonth = birthdayDate.getMonth(); // 0-11
+      
+      // Comparar día y mes
+      const isBirthday = (todayDay === birthdayDay && todayMonth === birthdayMonth);
+      
+      Logger.log('Hoy: ' + todayDay + '/' + (todayMonth + 1));
+      Logger.log('Cumpleaños: ' + birthdayDay + '/' + (birthdayMonth + 1));
+      Logger.log('Es cumpleaños: ' + isBirthday);
+      Logger.log('=== checkBirthday END ===');
+      
+      return {
+        isBirthday: isBirthday,
+        client: client,
+        message: isBirthday ? '¡Hoy es el cumpleaños del cliente!' : 'No es el cumpleaños del cliente'
+      };
+      
+    } catch (error) {
+      Logger.log('Error en checkBirthday: ' + error.message);
+      throw error;
+    }
+  }
+  
+  /**
+   * getTodayBirthdays - Obtiene todos los clientes que cumplen años hoy
+   * 
+   * Retorna una lista de todos los clientes activos que tienen
+   * cumpleaños en la fecha actual.
+   * 
+   * @returns {Array<Object>} Array de clientes con cumpleaños hoy
+   */
+  getTodayBirthdays() {
+    try {
+      Logger.log('=== getTodayBirthdays START ===');
+      
+      // Obtener todos los clientes activos
+      const allClients = this.clientRepo.findAll();
+      const activeClients = allClients.filter(function(c) {
+        return c.active === true || c.active === 'true';
+      });
+      
+      // Obtener fecha actual
+      const today = new Date();
+      const todayDay = today.getDate();
+      const todayMonth = today.getMonth();
+      
+      // Filtrar clientes con cumpleaños hoy
+      const birthdayClients = [];
+      
+      for (let i = 0; i < activeClients.length; i++) {
+        const client = activeClients[i];
+        
+        if (!client.birthday) {
+          continue;
+        }
+        
+        let birthdayDate = client.birthday;
+        if (typeof birthdayDate === 'string') {
+          birthdayDate = new Date(birthdayDate);
+        }
+        
+        if (isNaN(birthdayDate.getTime())) {
+          continue;
+        }
+        
+        const birthdayDay = birthdayDate.getDate();
+        const birthdayMonth = birthdayDate.getMonth();
+        
+        if (todayDay === birthdayDay && todayMonth === birthdayMonth) {
+          birthdayClients.push(client);
+        }
+      }
+      
+      Logger.log('Clientes con cumpleaños hoy: ' + birthdayClients.length);
+      Logger.log('=== getTodayBirthdays END ===');
+      
+      return birthdayClients;
+      
+    } catch (error) {
+      Logger.log('Error en getTodayBirthdays: ' + error.message);
+      throw error;
+    }
+  }
+  
+  /**
+   * applyBirthdayDiscount - Aplica descuento de cumpleaños a un total
+   * 
+   * Obtiene el porcentaje de descuento desde CFG_Params y lo aplica
+   * al total de la venta. Registra en auditoría.
+   * 
+   * Requisitos: 35.3
+   * 
+   * @param {number} total - Total de la venta
+   * @param {string} clientId - ID del cliente
+   * @param {string} userId - ID del usuario que aplica el descuento
+   * @returns {Object} {discountAmount, newTotal, discountPercent}
+   * @throws {Error} Si hay error al aplicar descuento
+   */
+  applyBirthdayDiscount(total, clientId, userId) {
+    try {
+      Logger.log('=== applyBirthdayDiscount START ===');
+      Logger.log('Total: ' + total);
+      Logger.log('Client ID: ' + clientId);
+      
+      // Validar parámetros
+      if (!total || total <= 0) {
+        throw new Error('Total debe ser mayor a 0');
+      }
+      
+      if (!clientId) {
+        throw new Error('ID de cliente es requerido');
+      }
+      
+      if (!userId) {
+        throw new Error('ID de usuario es requerido');
+      }
+      
+      // Verificar que sea cumpleaños del cliente
+      const birthdayCheck = this.checkBirthday(clientId);
+      
+      if (!birthdayCheck.isBirthday) {
+        throw new Error('No es el cumpleaños del cliente');
+      }
+      
+      // Obtener porcentaje de descuento desde CFG_Params
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const paramsSheet = ss.getSheetByName('CFG_Params');
+      
+      if (!paramsSheet) {
+        throw new Error('Hoja CFG_Params no encontrada');
+      }
+      
+      const data = paramsSheet.getDataRange().getValues();
+      let discountPercent = 15; // Default 15%
+      
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === 'BIRTHDAY_DISCOUNT_PERCENT') {
+          discountPercent = Number(data[i][1]) || 15;
+          break;
+        }
+      }
+      
+      // Calcular descuento
+      const discountAmount = (total * discountPercent) / 100;
+      const newTotal = total - discountAmount;
+      
+      Logger.log('Descuento aplicado: ' + discountPercent + '% = S/ ' + discountAmount.toFixed(2));
+      Logger.log('Nuevo total: S/ ' + newTotal.toFixed(2));
+      
+      // Auditar descuento de cumpleaños
+      const auditRepo = new AuditRepository();
+      auditRepo.log(
+        'BIRTHDAY_DISCOUNT',
+        'SALE',
+        clientId,
+        { total: total },
+        { total: newTotal, discount: discountAmount, discountPercent: discountPercent },
+        userId
+      );
+      
+      Logger.log('=== applyBirthdayDiscount END ===');
+      
+      return {
+        discountAmount: discountAmount,
+        newTotal: newTotal,
+        discountPercent: discountPercent
+      };
+      
+    } catch (error) {
+      Logger.log('Error en applyBirthdayDiscount: ' + error.message);
+      throw error;
+    }
+  }
+  
+  /**
+   * registerBirthdayGift - Registra un obsequio de cumpleaños
+   * 
+   * Permite registrar una "venta" con precio 0 para obsequios de cumpleaños.
+   * Decrementa el stock pero no genera ingreso en caja.
+   * Registra movimiento de inventario con motivo GIFT_BIRTHDAY.
+   * 
+   * Requisitos: 35.4, 35.5
+   * 
+   * @param {Object} giftData - Datos del obsequio
+   * @param {string} giftData.clientId - ID del cliente
+   * @param {string} giftData.productId - ID del producto obsequiado
+   * @param {number} giftData.quantity - Cantidad obsequiada
+   * @param {string} giftData.warehouseId - ID del almacén
+   * @param {string} giftData.userId - ID del usuario que registra
+   * @returns {Object} Registro del obsequio
+   * @throws {Error} Si hay error al registrar
+   */
+  registerBirthdayGift(giftData) {
+    try {
+      Logger.log('=== registerBirthdayGift START ===');
+      Logger.log('Gift data: ' + JSON.stringify(giftData));
+      
+      // Validar parámetros
+      if (!giftData.clientId) {
+        throw new Error('ID de cliente es requerido');
+      }
+      
+      if (!giftData.productId) {
+        throw new Error('ID de producto es requerido');
+      }
+      
+      if (!giftData.quantity || giftData.quantity <= 0) {
+        throw new Error('Cantidad debe ser mayor a 0');
+      }
+      
+      if (!giftData.warehouseId) {
+        throw new Error('ID de almacén es requerido');
+      }
+      
+      if (!giftData.userId) {
+        throw new Error('ID de usuario es requerido');
+      }
+      
+      // Verificar que sea cumpleaños del cliente
+      const birthdayCheck = this.checkBirthday(giftData.clientId);
+      
+      if (!birthdayCheck.isBirthday) {
+        throw new Error('No es el cumpleaños del cliente');
+      }
+      
+      // Verificar stock disponible
+      const inventoryService = new InventoryService();
+      const currentStock = inventoryService.checkStock(giftData.warehouseId, giftData.productId);
+      
+      if (currentStock < giftData.quantity) {
+        throw new Error('Stock insuficiente. Disponible: ' + currentStock + ', Solicitado: ' + giftData.quantity);
+      }
+      
+      // Decrementar stock
+      inventoryService.reserveStock(
+        giftData.warehouseId,
+        giftData.productId,
+        giftData.quantity,
+        'GIFT_BIRTHDAY_' + new Date().getTime(),
+        giftData.userId,
+        'Obsequio de cumpleaños para cliente ' + giftData.clientId
+      );
+      
+      // Registrar movimiento especial de obsequio
+      const movementRepo = new MovementRepository();
+      const movement = movementRepo.create({
+        id: 'mov-gift-' + new Date().getTime() + '-' + Math.random().toString(36).substr(2, 9),
+        warehouse_id: giftData.warehouseId,
+        product_id: giftData.productId,
+        type: 'GIFT_BIRTHDAY',
+        quantity: giftData.quantity,
+        reference_id: giftData.clientId,
+        user_id: giftData.userId,
+        reason: 'Obsequio de cumpleaños',
+        created_at: new Date()
+      });
+      
+      // Auditar obsequio
+      const auditRepo = new AuditRepository();
+      auditRepo.log(
+        'BIRTHDAY_GIFT',
+        'INVENTORY',
+        movement.id,
+        {},
+        {
+          clientId: giftData.clientId,
+          productId: giftData.productId,
+          quantity: giftData.quantity,
+          warehouseId: giftData.warehouseId
+        },
+        giftData.userId
+      );
+      
+      Logger.log('Obsequio registrado exitosamente');
+      Logger.log('=== registerBirthdayGift END ===');
+      
+      return {
+        movement: movement,
+        client: birthdayCheck.client,
+        message: 'Obsequio de cumpleaños registrado exitosamente'
+      };
+      
+    } catch (error) {
+      Logger.log('Error en registerBirthdayGift: ' + error.message);
+      throw error;
+    }
+  }
+}
+
+/**
+ * checkClientBirthday - Wrapper para frontend
+ * 
+ * @param {string} clientId - ID del cliente
+ * @returns {Object} Respuesta con wrapResponse
+ */
+function checkClientBirthday(clientId) {
+  return wrapResponse(function() {
+    const birthdayService = new BirthdayService();
+    return birthdayService.checkBirthday(clientId);
+  });
+}
+
+/**
+ * getTodayBirthdays - Wrapper para frontend
+ * 
+ * @returns {Object} Respuesta con array de clientes
+ */
+function getTodayBirthdays() {
+  return wrapResponse(function() {
+    const birthdayService = new BirthdayService();
+    return birthdayService.getTodayBirthdays();
+  });
+}
+
+/**
+ * applyBirthdayDiscountWrapper - Wrapper para frontend
+ * 
+ * @param {number} total - Total de la venta
+ * @param {string} clientId - ID del cliente
+ * @param {string} userId - ID del usuario
+ * @returns {Object} Respuesta con descuento aplicado
+ */
+function applyBirthdayDiscountWrapper(total, clientId, userId) {
+  return wrapResponse(function() {
+    const birthdayService = new BirthdayService();
+    return birthdayService.applyBirthdayDiscount(total, clientId, userId);
+  });
+}
+
+/**
+ * registerBirthdayGift - Wrapper para frontend
+ * 
+ * @param {Object} giftData - Datos del obsequio
+ * @returns {Object} Respuesta con obsequio registrado
+ */
+function registerBirthdayGift(giftData) {
+  return wrapResponse(function() {
+    const birthdayService = new BirthdayService();
+    return birthdayService.registerBirthdayGift(giftData);
+  });
 }

@@ -169,7 +169,11 @@
           error: function(xhr, error, thrown) {
             console.error('Error AJAX:', error, thrown);
             console.error('XHR:', xhr);
-            alert('Error al cargar clientes. Por favor, recargue la página.');
+            if (window.handleDataTableError) {
+              window.handleDataTableError(xhr, error, thrown, 'clientsTable');
+            } else {
+              alert('Error al cargar clientes. Por favor, recargue la página.');
+            }
           }
         },
         columns: [
