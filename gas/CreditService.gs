@@ -56,14 +56,19 @@ class CreditService {
    * correspondientes con montos y fechas de vencimiento calculadas,
    * y decrementa el cupo disponible del cliente.
    * 
+   * MEJORADO: Usa LockManager para atomicidad e IdempotencyManager
+   * 
    * Requisitos: 7.3, 7.4, 7.5
    * 
    * @param {string} saleId - ID de la venta a la que se asocia el plan
    * @param {number} installments - Número de cuotas (1-6)
+   * @param {string} requestId - ID único para idempotencia (opcional)
    * @returns {Object} Plan de crédito creado con sus cuotas
    * @throws {Error} Si hay error en validaciones o al crear el plan
    */
-  createCreditPlan(saleId, installments) {
+  createCreditPlan(saleId, installments, requestId) {
+    let lock = null;
+    
     try {
       // ========================================================================
       // VALIDACIONES
@@ -83,201 +88,238 @@ class CreditService {
       // Convertir a número entero
       const numInstallments = Math.floor(Number(installments));
       
-      Logger.log('createCreditPlan: iniciando para saleId=' + saleId + ', installments=' + numInstallments);
+      // Generar requestId si no se proporciona
+      const effectiveRequestId = requestId || ('credit_plan_' + saleId + '_' + new Date().getTime());
+      
+      Logger.log('createCreditPlan: iniciando para saleId=' + saleId + ', installments=' + numInstallments + ', requestId=' + effectiveRequestId);
       
       // ========================================================================
-      // OBTENER DATOS DE LA VENTA
+      // IDEMPOTENCIA
       // ========================================================================
       
-      // Buscar la venta
-      const sale = this.saleRepo.findById(saleId);
-      
-      if (!sale) {
-        throw new Error('Venta no encontrada con ID: ' + saleId);
-      }
-      
-      // Verificar que la venta sea de tipo CREDITO
-      if (sale.sale_type !== SALE_TYPES.CREDITO) {
-        throw new Error('La venta debe ser de tipo CREDITO para crear un plan de crédito');
-      }
-      
-      // Verificar que la venta tenga un cliente asociado
-      if (!sale.client_id) {
-        throw new Error('La venta debe tener un cliente asociado para crear un plan de crédito');
-      }
-      
-      // Obtener el monto total de la venta
-      const totalAmount = Number(sale.total) || 0;
-      
-      if (totalAmount <= 0) {
-        throw new Error('El monto total de la venta debe ser mayor a cero');
-      }
-      
-      Logger.log('createCreditPlan: venta encontrada, total=' + totalAmount + ', clientId=' + sale.client_id);
-      
-      // ========================================================================
-      // OBTENER DATOS DEL CLIENTE
-      // ========================================================================
-      
-      // Buscar el cliente
-      const client = this.clientRepo.findById(sale.client_id);
-      
-      if (!client) {
-        throw new Error('Cliente no encontrado con ID: ' + sale.client_id);
-      }
-      
-      // Verificar que el cliente esté activo
-      if (!client.active) {
-        throw new Error('El cliente no está activo');
-      }
-      
-      Logger.log('createCreditPlan: cliente encontrado, name=' + client.name);
-      
-      // ========================================================================
-      // CALCULAR MONTO DE CADA CUOTA
-      // ========================================================================
-      
-      // Calcular monto de cada cuota (total / installments)
-      // Usar redondeo a 2 decimales para evitar problemas de precisión
-      const installmentAmount = Math.round((totalAmount / numInstallments) * 100) / 100;
-      
-      Logger.log('createCreditPlan: monto por cuota=' + installmentAmount);
-      
-      // ========================================================================
-      // CREAR PLAN DE CRÉDITO
-      // ========================================================================
-      
-      // Generar ID único para el plan
-      const planId = 'plan-' + new Date().getTime() + '-' + Math.random().toString(36).substr(2, 9);
-      
-      // Crear objeto del plan de crédito
-      const creditPlan = {
-        id: planId,
-        sale_id: saleId,
-        client_id: sale.client_id,
-        total_amount: totalAmount,
-        installments_count: numInstallments,
-        installment_amount: installmentAmount,
-        status: CREDIT_PLAN_STATUS.ACTIVE,
-        created_at: new Date()
-      };
-      
-      // Guardar el plan en la base de datos
-      const createdPlan = this.creditPlanRepo.create(creditPlan);
-      
-      Logger.log('createCreditPlan: plan creado con ID=' + planId);
-      
-      // ========================================================================
-      // CREAR CUOTAS
-      // ========================================================================
-      
-      const createdInstallments = [];
-      let totalInstallmentsAmount = 0;
-      
-      // Calcular fechas de vencimiento
-      // Primera cuota vence en 30 días, las siguientes cada 30 días adicionales
-      const today = new Date();
-      
-      for (let i = 1; i <= numInstallments; i++) {
-        // Calcular fecha de vencimiento (30 días * número de cuota)
-        const dueDate = new Date(today);
-        dueDate.setDate(dueDate.getDate() + (30 * i));
+      const idempotencyResult = IdempotencyManager.checkAndStore(effectiveRequestId, function() {
         
-        // Para la última cuota, ajustar el monto para que la suma sea exacta
-        let cuotaAmount = installmentAmount;
+        // ======================================================================
+        // ADQUIRIR LOCK
+        // ======================================================================
         
-        if (i === numInstallments) {
-          // Última cuota: ajustar para que la suma total sea exacta
-          cuotaAmount = totalAmount - totalInstallmentsAmount;
-          // Redondear a 2 decimales
-          cuotaAmount = Math.round(cuotaAmount * 100) / 100;
+        lock = LockManager.acquireLock('create_credit_plan_' + saleId);
+        Logger.log('createCreditPlan: lock adquirido');
+        
+        // ======================================================================
+        // OBTENER DATOS DE LA VENTA
+        // ======================================================================
+        
+        // Buscar la venta
+        const sale = this.saleRepo.findById(saleId);
+        
+        if (!sale) {
+          throw new Error('Venta no encontrada con ID: ' + saleId);
         }
         
-        totalInstallmentsAmount += cuotaAmount;
+        // Verificar que la venta sea de tipo CREDITO
+        if (sale.sale_type !== SALE_TYPES.CREDITO) {
+          throw new Error('La venta debe ser de tipo CREDITO para crear un plan de crédito');
+        }
         
-        // Generar ID único para la cuota
-        const installmentId = 'inst-' + new Date().getTime() + '-' + i + '-' + Math.random().toString(36).substr(2, 9);
+        // Verificar que la venta tenga un cliente asociado
+        if (!sale.client_id) {
+          throw new Error('La venta debe tener un cliente asociado para crear un plan de crédito');
+        }
         
-        // Crear objeto de la cuota
-        const installment = {
-          id: installmentId,
-          plan_id: planId,
-          installment_number: i,
-          amount: cuotaAmount,
-          due_date: dueDate,
-          paid_amount: 0,
-          status: INSTALLMENT_STATUS.PENDING,
-          paid_at: null
-        };
+        // Obtener el monto total de la venta
+        const totalAmount = Number(sale.total) || 0;
         
-        // Guardar la cuota en la base de datos
-        const createdInstallment = this.installmentRepo.create(installment);
-        createdInstallments.push(createdInstallment);
+        if (totalAmount <= 0) {
+          throw new Error('El monto total de la venta debe ser mayor a cero');
+        }
         
-        Logger.log('createCreditPlan: cuota ' + i + ' creada, monto=' + cuotaAmount + ', vence=' + formatDate(dueDate));
-      }
-      
-      Logger.log('createCreditPlan: ' + numInstallments + ' cuotas creadas, suma total=' + totalInstallmentsAmount);
-      
-      // ========================================================================
-      // DECREMENTAR CUPO DISPONIBLE DEL CLIENTE
-      // ========================================================================
-      
-      // Obtener cupo actual usado
-      const currentCreditUsed = Number(client.credit_used) || 0;
-      
-      // Calcular nuevo cupo usado
-      const newCreditUsed = currentCreditUsed + totalAmount;
-      
-      // Actualizar cliente con nuevo cupo usado
-      client.credit_used = newCreditUsed;
-      
-      this.clientRepo.update(client.id, client);
-      
-      Logger.log('createCreditPlan: cupo del cliente actualizado, usado anterior=' + currentCreditUsed + ', nuevo usado=' + newCreditUsed);
-      
-      // ========================================================================
-      // AUDITORÍA
-      // ========================================================================
-      
-      // Registrar la creación del plan de crédito en auditoría
-      this.auditRepo.log(
-        'CREATE_CREDIT_PLAN',
-        'CREDIT_PLAN',
-        planId,
-        null,
-        {
+        Logger.log('createCreditPlan: venta encontrada, total=' + totalAmount + ', clientId=' + sale.client_id);
+        
+        // ======================================================================
+        // OBTENER DATOS DEL CLIENTE
+        // ======================================================================
+        
+        // Buscar el cliente
+        const client = this.clientRepo.findById(sale.client_id);
+        
+        if (!client) {
+          throw new Error('Cliente no encontrado con ID: ' + sale.client_id);
+        }
+        
+        // Verificar que el cliente esté activo
+        if (!client.active) {
+          throw new Error('El cliente no está activo');
+        }
+        
+        Logger.log('createCreditPlan: cliente encontrado, name=' + client.name);
+        
+        // ======================================================================
+        // CALCULAR MONTO DE CADA CUOTA
+        // ======================================================================
+        
+        // Calcular monto de cada cuota (total / installments)
+        // Usar redondeo a 2 decimales para evitar problemas de precisión
+        const installmentAmount = Math.round((totalAmount / numInstallments) * 100) / 100;
+        
+        Logger.log('createCreditPlan: monto por cuota=' + installmentAmount);
+        
+        // ======================================================================
+        // CREAR PLAN DE CRÉDITO
+        // ======================================================================
+        
+        // Generar ID único para el plan
+        const planId = 'plan-' + new Date().getTime() + '-' + Math.random().toString(36).substr(2, 9);
+        
+        // Crear objeto del plan de crédito
+        const creditPlan = {
+          id: planId,
           sale_id: saleId,
           client_id: sale.client_id,
           total_amount: totalAmount,
           installments_count: numInstallments,
           installment_amount: installmentAmount,
-          client_credit_used_before: currentCreditUsed,
-          client_credit_used_after: newCreditUsed
-        },
-        sale.user_id || 'system'
-      );
-      
-      Logger.log('createCreditPlan: auditoría registrada');
-      
-      // ========================================================================
-      // RETORNAR RESULTADO
-      // ========================================================================
-      
-      // Retornar el plan creado con sus cuotas
-      return {
-        plan: createdPlan,
-        installments: createdInstallments,
-        client: {
-          id: client.id,
-          name: client.name,
-          credit_limit: client.credit_limit,
-          credit_used: newCreditUsed,
-          credit_available: (Number(client.credit_limit) || 0) - newCreditUsed
+          status: CREDIT_PLAN_STATUS.ACTIVE,
+          created_at: new Date()
+        };
+        
+        // Guardar el plan en la base de datos
+        const createdPlan = this.creditPlanRepo.create(creditPlan);
+        
+        Logger.log('createCreditPlan: plan creado con ID=' + planId);
+        
+        // ======================================================================
+        // CREAR CUOTAS
+        // ======================================================================
+        
+        const createdInstallments = [];
+        let totalInstallmentsAmount = 0;
+        
+        // Calcular fechas de vencimiento
+        // Primera cuota vence en 30 días, las siguientes cada 30 días adicionales
+        const today = new Date();
+        
+        for (let i = 1; i <= numInstallments; i++) {
+          // Calcular fecha de vencimiento (30 días * número de cuota)
+          const dueDate = new Date(today);
+          dueDate.setDate(dueDate.getDate() + (30 * i));
+          
+          // Para la última cuota, ajustar el monto para que la suma sea exacta
+          let cuotaAmount = installmentAmount;
+          
+          if (i === numInstallments) {
+            // Última cuota: ajustar para que la suma total sea exacta
+            cuotaAmount = totalAmount - totalInstallmentsAmount;
+            // Redondear a 2 decimales
+            cuotaAmount = Math.round(cuotaAmount * 100) / 100;
+          }
+          
+          totalInstallmentsAmount += cuotaAmount;
+          
+          // Generar ID único para la cuota
+          const installmentId = 'inst-' + new Date().getTime() + '-' + i + '-' + Math.random().toString(36).substr(2, 9);
+          
+          // Crear objeto de la cuota
+          const installment = {
+            id: installmentId,
+            plan_id: planId,
+            installment_number: i,
+            amount: cuotaAmount,
+            due_date: dueDate,
+            paid_amount: 0,
+            status: INSTALLMENT_STATUS.PENDING,
+            paid_at: null
+          };
+          
+          // Guardar la cuota en la base de datos
+          const createdInstallment = this.installmentRepo.create(installment);
+          createdInstallments.push(createdInstallment);
+          
+          Logger.log('createCreditPlan: cuota ' + i + ' creada, monto=' + cuotaAmount + ', vence=' + formatDate(dueDate));
         }
-      };
+        
+        Logger.log('createCreditPlan: ' + numInstallments + ' cuotas creadas, suma total=' + totalInstallmentsAmount);
+        
+        // ======================================================================
+        // DECREMENTAR CUPO DISPONIBLE DEL CLIENTE
+        // ======================================================================
+        
+        // Obtener cupo actual usado
+        const currentCreditUsed = Number(client.credit_used) || 0;
+        
+        // Calcular nuevo cupo usado
+        const newCreditUsed = currentCreditUsed + totalAmount;
+        
+        // Actualizar cliente con nuevo cupo usado
+        client.credit_used = newCreditUsed;
+        
+        this.clientRepo.update(client.id, client);
+        
+        Logger.log('createCreditPlan: cupo del cliente actualizado, usado anterior=' + currentCreditUsed + ', nuevo usado=' + newCreditUsed);
+        
+        // ======================================================================
+        // AUDITORÍA
+        // ======================================================================
+        
+        // Registrar la creación del plan de crédito en auditoría
+        this.auditRepo.log(
+          'CREATE_CREDIT_PLAN',
+          'CREDIT_PLAN',
+          planId,
+          null,
+          {
+            sale_id: saleId,
+            client_id: sale.client_id,
+            total_amount: totalAmount,
+            installments_count: numInstallments,
+            installment_amount: installmentAmount,
+            client_credit_used_before: currentCreditUsed,
+            client_credit_used_after: newCreditUsed
+          },
+          sale.user_id || 'system'
+        );
+        
+        Logger.log('createCreditPlan: auditoría registrada');
+        
+        // Liberar lock
+        if (lock) {
+          LockManager.releaseLock(lock);
+          lock = null;
+        }
+        
+        // ======================================================================
+        // RETORNAR RESULTADO
+        // ======================================================================
+        
+        // Retornar el plan creado con sus cuotas
+        return {
+          plan: createdPlan,
+          installments: createdInstallments,
+          client: {
+            id: client.id,
+            name: client.name,
+            credit_limit: client.credit_limit,
+            credit_used: newCreditUsed,
+            credit_available: (Number(client.credit_limit) || 0) - newCreditUsed
+          }
+        };
+        
+      }.bind(this)); // Fin de IdempotencyManager.checkAndStore
+      
+      // Si ya fue procesado, retornar resultado anterior
+      if (idempotencyResult.processed) {
+        Logger.log('createCreditPlan: requestId ya procesado, retornando resultado anterior');
+        return idempotencyResult.result;
+      }
+      
+      return idempotencyResult.result;
       
     } catch (error) {
+      // Asegurar que el lock se libere en caso de error
+      if (lock) {
+        LockManager.releaseLock(lock);
+      }
+      
       Logger.log('Error en createCreditPlan: ' + error.message);
       throw new Error('Error al crear plan de crédito: ' + error.message);
     }
@@ -589,6 +631,8 @@ class CreditService {
    * Requiere permisos de supervisor y un motivo obligatorio.
    * Registra la reprogramación en auditoría.
    * 
+   * MEJORADO: Usa LockManager para atomicidad
+   * 
    * Requisitos: 24.1, 24.2, 24.3, 24.4, 24.5
    * 
    * @param {string} installmentId - ID de la cuota a reprogramar
@@ -599,6 +643,8 @@ class CreditService {
    * @throws {Error} Si hay error en validaciones o al reprogramar
    */
   rescheduleInstallment(installmentId, newDate, reason, userId) {
+    let lock = null;
+    
     try {
       // ========================================================================
       // VALIDACIONES
@@ -646,6 +692,13 @@ class CreditService {
       }
       
       Logger.log('rescheduleInstallment: permisos de supervisor verificados');
+      
+      // ========================================================================
+      // ADQUIRIR LOCK
+      // ========================================================================
+      
+      lock = LockManager.acquireLock('reschedule_installment_' + installmentId);
+      Logger.log('rescheduleInstallment: lock adquirido');
       
       // ========================================================================
       // OBTENER CUOTA
@@ -720,6 +773,12 @@ class CreditService {
       
       Logger.log('rescheduleInstallment: auditoría registrada');
       
+      // Liberar lock
+      if (lock) {
+        LockManager.releaseLock(lock);
+        lock = null;
+      }
+      
       // ========================================================================
       // RETORNAR RESULTADO
       // ========================================================================
@@ -735,6 +794,11 @@ class CreditService {
       };
       
     } catch (error) {
+      // Asegurar que el lock se libere en caso de error
+      if (lock) {
+        LockManager.releaseLock(lock);
+      }
+      
       Logger.log('Error en rescheduleInstallment: ' + error.message);
       throw new Error('Error al reprogramar cuota: ' + error.message);
     }

@@ -1338,6 +1338,8 @@ class MovementRepository extends BaseRepository {
  * Gestiona el acceso a la hoja de clientes.
  * Hereda todas las operaciones CRUD de BaseRepository.
  * 
+ * MEJORADO: Usa CacheService para optimizar rendimiento
+ * 
  * @class
  * @extends BaseRepository
  */
@@ -1347,6 +1349,82 @@ class ClientRepository extends BaseRepository {
    */
   constructor() {
     super(SHEETS.CRM_CLIENTS);
+  }
+  
+  /**
+   * findAll - Obtiene todos los clientes con caché
+   * 
+   * Override del método base para agregar caché de clientes.
+   * 
+   * @returns {Array<Object>} Array de clientes
+   */
+  findAll() {
+    try {
+      // Intentar obtener del caché primero
+      const cacheKey = 'clients_all';
+      const cached = CacheManager.get(cacheKey);
+      
+      if (cached !== null && Array.isArray(cached)) {
+        Logger.log('findAll (ClientRepository): retornando desde caché (' + cached.length + ' clientes)');
+        return cached;
+      }
+      
+      // Si no está en caché, obtener de la base de datos
+      const clients = BaseRepository.prototype.findAll.call(this);
+      
+      // Solo cachear si hay menos de 500 clientes
+      if (clients.length < 500) {
+        // Guardar en caché por 5 minutos
+        CacheManager.put(cacheKey, clients, LIMITS.CACHE_TTL_PRODUCTS);
+        Logger.log('findAll (ClientRepository): obtenido de BD y guardado en caché (' + clients.length + ' clientes)');
+      } else {
+        Logger.log('findAll (ClientRepository): obtenido de BD sin caché (' + clients.length + ' clientes - demasiados para cachear)');
+      }
+      
+      return clients;
+      
+    } catch (error) {
+      Logger.log('Error en findAll de ClientRepository: ' + error.message);
+      // En caso de error, intentar obtener directamente de BD sin caché
+      return BaseRepository.prototype.findAll.call(this);
+    }
+  }
+  
+  /**
+   * create - Crea un cliente e invalida el caché
+   * 
+   * Override del método base para invalidar caché al crear.
+   * 
+   * @param {Object} obj - Objeto cliente a crear
+   * @returns {Object} Cliente creado
+   */
+  create(obj) {
+    const result = BaseRepository.prototype.create.call(this, obj);
+    
+    // Invalidar caché de clientes
+    CacheManager.invalidate('clients_all');
+    Logger.log('create (ClientRepository): caché invalidado');
+    
+    return result;
+  }
+  
+  /**
+   * update - Actualiza un cliente e invalida el caché
+   * 
+   * Override del método base para invalidar caché al actualizar.
+   * 
+   * @param {string} id - ID del cliente
+   * @param {Object} obj - Objeto cliente con datos actualizados
+   * @returns {Object} Cliente actualizado
+   */
+  update(id, obj) {
+    const result = BaseRepository.prototype.update.call(this, id, obj);
+    
+    // Invalidar caché de clientes
+    CacheManager.invalidate('clients_all');
+    Logger.log('update (ClientRepository): caché invalidado');
+    
+    return result;
   }
   
   /**
@@ -1365,7 +1443,7 @@ class ClientRepository extends BaseRepository {
       // Normalizar DNI (trim)
       const normalizedDNI = String(dni).trim();
       
-      // Obtener todos los clientes
+      // Obtener todos los clientes (usa caché automáticamente)
       const clients = this.findAll();
       
       // Buscar por DNI
@@ -1408,7 +1486,7 @@ class ClientRepository extends BaseRepository {
         return [];
       }
       
-      // Obtener todos los clientes
+      // Obtener todos los clientes (usa caché automáticamente)
       const clients = this.findAll();
       
       // Filtrar clientes que coincidan en nombre, DNI o teléfono

@@ -601,6 +601,8 @@ class InventoryService {
    * Valida que haya stock suficiente antes de decrementar.
    * Registra un movimiento de tipo SALIDA.
    * 
+   * MEJORADO: Usa LockManager para atomicidad
+   * 
    * Requisitos: 4.2, 4.5
    * 
    * @param {string} warehouseId - ID del almacén
@@ -613,6 +615,8 @@ class InventoryService {
    * @throws {Error} Si no hay stock suficiente o hay error
    */
   reserveStock(warehouseId, productId, quantity, referenceId, userId, reason) {
+    let lock = null;
+    
     try {
       // Validar parámetros
       if (!warehouseId) {
@@ -627,6 +631,10 @@ class InventoryService {
       if (!userId) {
         throw new Error('userId es requerido');
       }
+      
+      // Adquirir lock para atomicidad
+      lock = LockManager.acquireLock('reserve_stock_' + warehouseId + '_' + productId);
+      Logger.log('reserveStock: lock adquirido');
       
       // Verificar stock disponible
       const currentStock = this.checkStock(warehouseId, productId);
@@ -649,11 +657,22 @@ class InventoryService {
         reason: reason || 'Reserva de stock'
       });
       
+      // Liberar lock
+      if (lock) {
+        LockManager.releaseLock(lock);
+        lock = null;
+      }
+      
       Logger.log('reserveStock: reservado ' + quantity + ' unidades de producto ' + productId + ' en almacén ' + warehouseId);
       
       return updatedStock;
       
     } catch (error) {
+      // Asegurar que el lock se libere en caso de error
+      if (lock) {
+        LockManager.releaseLock(lock);
+      }
+      
       Logger.log('Error en reserveStock: ' + error.message);
       throw new Error('Error al reservar stock: ' + error.message);
     }
@@ -665,6 +684,8 @@ class InventoryService {
    * Incrementa el stock del producto en el almacén.
    * Registra un movimiento de tipo ENTRADA.
    * 
+   * MEJORADO: Usa LockManager para atomicidad
+   * 
    * @param {string} warehouseId - ID del almacén
    * @param {string} productId - ID del producto
    * @param {number} quantity - Cantidad a liberar
@@ -675,6 +696,8 @@ class InventoryService {
    * @throws {Error} Si hay error
    */
   releaseStock(warehouseId, productId, quantity, referenceId, userId, reason) {
+    let lock = null;
+    
     try {
       // Validar parámetros
       if (!warehouseId) {
@@ -690,6 +713,10 @@ class InventoryService {
         throw new Error('userId es requerido');
       }
       
+      // Adquirir lock para atomicidad
+      lock = LockManager.acquireLock('release_stock_' + warehouseId + '_' + productId);
+      Logger.log('releaseStock: lock adquirido');
+      
       // Incrementar stock
       const updatedStock = this.stockRepo.updateQuantity(warehouseId, productId, quantity);
       
@@ -704,11 +731,22 @@ class InventoryService {
         reason: reason || 'Liberación de stock'
       });
       
+      // Liberar lock
+      if (lock) {
+        LockManager.releaseLock(lock);
+        lock = null;
+      }
+      
       Logger.log('releaseStock: liberado ' + quantity + ' unidades de producto ' + productId + ' en almacén ' + warehouseId);
       
       return updatedStock;
       
     } catch (error) {
+      // Asegurar que el lock se libere en caso de error
+      if (lock) {
+        LockManager.releaseLock(lock);
+      }
+      
       Logger.log('Error en releaseStock: ' + error.message);
       throw new Error('Error al liberar stock: ' + error.message);
     }
@@ -1499,7 +1537,8 @@ class POSService {
           Logger.log('createSale: creando plan de crédito con ' + saleData.installments + ' cuotas');
           
           const creditService = new CreditService();
-          const creditResult = creditService.createCreditPlan(createdSale.id, saleData.installments);
+          const creditPlanRequestId = requestId + '_credit_plan';
+          const creditResult = creditService.createCreditPlan(createdSale.id, saleData.installments, creditPlanRequestId);
           
           creditPlan = creditResult;
           
