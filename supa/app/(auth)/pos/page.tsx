@@ -66,7 +66,7 @@ export default function POSPage() {
   const [saleType, setSaleType] = useState<SaleType>('CONTADO')
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [installments, setInstallments] = useState<number>(1)
-  const [warehouse, setWarehouse] = useState<string>('Mujeres')
+  const [warehouse, setWarehouse] = useState<string>('Tienda Mujeres')
   const [processing, setProcessing] = useState(false)
   const [showReceipt, setShowReceipt] = useState(false)
   const [receiptData, setReceiptData] = useState<any>(null)
@@ -272,8 +272,8 @@ export default function POSPage() {
             disabled={processing}
             className="text-sm border rounded px-2 py-1 w-full"
           >
-            <option value="Mujeres">Tienda Mujeres</option>
-            <option value="Hombres">Tienda Hombres</option>
+            <option value="Tienda Mujeres">Tienda Mujeres</option>
+            <option value="Tienda Hombres">Tienda Hombres</option>
           </select>
         </Card>
       </div>

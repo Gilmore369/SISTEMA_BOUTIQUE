@@ -500,8 +500,8 @@ export async function createSize(data: FormData | { name: string; category_id: s
       }
     : data
 
-  // Validate input (description removed to match DB schema)
-  const validated = sizeSchema.omit({ description: true }).safeParse(inputData)
+  // Validate input
+  const validated = sizeSchema.safeParse(inputData)
 
   if (!validated.success) {
     return { success: false, error: validated.error.flatten().fieldErrors }
@@ -543,7 +543,6 @@ export async function updateSize(id: string, formData: FormData): Promise<Action
   const validated = sizeSchema.partial().safeParse({
     name: formData.get('name') || undefined,
     category_id: formData.get('category_id') || undefined,
-    description: formData.get('description') || undefined
   })
 
   if (!validated.success) {

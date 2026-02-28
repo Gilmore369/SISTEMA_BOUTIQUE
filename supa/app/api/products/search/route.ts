@@ -26,8 +26,8 @@ export async function GET(request: NextRequest) {
     // Get query parameter
     const query = searchParams.get('q') || ''
     
-    // Get warehouse parameter (default TIENDA_MUJERES)
-    const warehouse = searchParams.get('warehouse') || 'TIENDA_MUJERES'
+    // Get warehouse parameter (default Tienda Mujeres)
+    const warehouse = searchParams.get('warehouse') || 'Tienda Mujeres'
     
     // Get limit parameter (default 50, max 50 enforced)
     const limitParam = searchParams.get('limit')
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get stock for each product from the specified warehouse.
-    // stock.warehouse_id is a TEXT field ('Mujeres' or 'Hombres').
+    // stock.warehouse_id is a TEXT field ('Tienda Mujeres' or 'Tienda Hombres').
     // Use case-insensitive match to be robust against casing differences.
     // Only fetch rows with quantity > 0 — products without stock in this
     // store are excluded from results (strict store isolation).

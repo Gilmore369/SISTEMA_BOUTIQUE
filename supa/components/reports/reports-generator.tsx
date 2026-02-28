@@ -471,8 +471,8 @@ export function ReportsGenerator() {
                 <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas</SelectItem>
-                  <SelectItem value="TIENDA_HOMBRES">Hombres</SelectItem>
-                  <SelectItem value="TIENDA_MUJERES">Mujeres</SelectItem>
+                  <SelectItem value="Tienda Hombres">Tienda Hombres</SelectItem>
+                  <SelectItem value="Tienda Mujeres">Tienda Mujeres</SelectItem>
                 </SelectContent>
               </Select>
             </div>

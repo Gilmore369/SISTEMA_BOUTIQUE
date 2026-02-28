@@ -63,7 +63,7 @@ export function ProductFormMultiSize({ onSuccess, onCancel }: ProductFormMultiSi
   const [imageUrl, setImageUrl] = useState('')
   const [purchasePrice, setPurchasePrice] = useState(0)
   const [salePrice, setSalePrice] = useState(0)
-  const [warehouse, setWarehouse] = useState('TIENDA_MUJERES')
+  const [warehouse, setWarehouse] = useState('Tienda Mujeres')
   
   // Size variants
   const [variants, setVariants] = useState<SizeVariant[]>([])
@@ -419,8 +419,8 @@ export function ProductFormMultiSize({ onSuccess, onCancel }: ProductFormMultiSi
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="TIENDA_MUJERES">Tienda Mujeres</SelectItem>
-                <SelectItem value="TIENDA_HOMBRES">Tienda Hombres</SelectItem>
+                <SelectItem value="Tienda Mujeres">Tienda Mujeres</SelectItem>
+                <SelectItem value="Tienda Hombres">Tienda Hombres</SelectItem>
               </SelectContent>
             </Select>
           </div>

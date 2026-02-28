@@ -37,7 +37,6 @@ export const brandSchema = z.object({
 export const sizeSchema = z.object({
   name: z.string().min(1, 'Name is required').max(50, 'Name must be less than 50 characters'),
   category_id: z.string().uuid('Invalid category ID'),
-  description: z.string().optional()
 })
 
 /**

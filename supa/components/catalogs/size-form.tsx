@@ -22,7 +22,6 @@ interface SizeFormProps {
   defaultValues?: {
     name?: string
     category_id?: string
-    description?: string
   }
 }
 
@@ -58,15 +57,6 @@ export function SizeForm({ categories, defaultValues }: SizeFormProps) {
             ))}
           </SelectContent>
         </Select>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="description">Descripción</Label>
-        <Input
-          id="description"
-          name="description"
-          defaultValue={defaultValues?.description}
-          placeholder="Descripción opcional"
-        />
       </div>
     </div>
   )

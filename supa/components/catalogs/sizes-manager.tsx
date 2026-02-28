@@ -20,7 +20,6 @@ interface Size {
   id: string
   name: string
   category_id: string
-  description?: string
   active: boolean
   created_at: string
   categories?: { name: string; line_id?: string }
@@ -80,7 +79,11 @@ export function SizesManager({ initialSizes, categories, lines }: SizesManagerPr
       label: 'Categoría',
       render: (size) => size.categories?.name || '-'
     },
-    { key: 'description', label: 'Descripción' },
+    {
+      key: 'active',
+      label: 'Estado',
+      render: (size) => size.active ? 'Activo' : 'Inactivo'
+    },
     {
       key: 'created_at',
       label: 'Fecha de creación',

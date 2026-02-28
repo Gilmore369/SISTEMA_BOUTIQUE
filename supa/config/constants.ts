@@ -86,9 +86,16 @@ export const ROLES = {
 
 /**
  * Stores/Warehouses
+ * Physical store locations - these are the only valid values for warehouse_id and store_id
  */
 export const STORES = {
-  MUJERES: 'Mujeres',
-  HOMBRES: 'Hombres',
-  NINOS: 'Niños',
+  MUJERES: 'Tienda Mujeres',
+  HOMBRES: 'Tienda Hombres',
 } as const;
+
+export type StoreId = typeof STORES[keyof typeof STORES];
+
+export const STORE_OPTIONS = [
+  { value: STORES.MUJERES, label: 'Tienda Mujeres' },
+  { value: STORES.HOMBRES, label: 'Tienda Hombres' },
+] as const;

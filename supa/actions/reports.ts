@@ -236,7 +236,7 @@ export async function generateSalesByPeriodReport(filters: ReportFilters) {
   return (sales || []).map((sale: any) => ({
     fecha: new Date(sale.created_at).toLocaleDateString('es-PE'),
     numeroVenta: sale.sale_number,
-    tienda: sale.store_id === 'TIENDA_HOMBRES' ? 'Hombres' : 'Mujeres',
+    tienda: sale.store_id === 'Tienda Hombres' ? 'Tienda Hombres' : 'Tienda Mujeres',
     tipo: sale.sale_type === 'CREDITO' ? 'Credito' : 'Contado',
     metodoPago: sale.payment_type || 'N/A',
     subtotal: Number(sale.subtotal),
@@ -458,9 +458,7 @@ export async function generateSalesByStoreReport(filters: ReportFilters) {
 
   const storeData = (sales || []).reduce((acc: any, sale: any) => {
     const store = sale.store_id || 'Sin tienda'
-    const storeName = store === 'TIENDA_HOMBRES' ? 'Tienda Hombres'
-      : store === 'TIENDA_MUJERES' ? 'Tienda Mujeres'
-      : store
+    const storeName = store
 
     if (!acc[storeName]) {
       acc[storeName] = { tienda: storeName, cantidadVentas: 0, totalContado: 0, totalCredito: 0, total: 0 }

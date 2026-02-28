@@ -44,7 +44,7 @@ export function CashShiftManager({ openShifts, recentShifts, userId }: CashShift
   const [isOpening, setIsOpening] = useState(false)
   const [isClosing, setIsClosing] = useState(false)
   const [openingAmount, setOpeningAmount] = useState('')
-  const [storeId, setStoreId] = useState('TIENDA_HOMBRES')
+  const [storeId, setStoreId] = useState('Tienda Hombres')
   const [closingAmount, setClosingAmount] = useState('')
   const [expenseAmount, setExpenseAmount] = useState('')
   const [expenseCategory, setExpenseCategory] = useState('')
@@ -54,8 +54,8 @@ export function CashShiftManager({ openShifts, recentShifts, userId }: CashShift
   // Get available stores (stores without open shifts)
   const openStoreIds = openShifts.map(shift => shift.store_id)
   const availableStores = [
-    { id: 'TIENDA_HOMBRES', name: 'Tienda de Hombres' },
-    { id: 'TIENDA_MUJERES', name: 'Tienda de Mujeres' }
+    { id: 'Tienda Hombres', name: 'Tienda Hombres' },
+    { id: 'Tienda Mujeres', name: 'Tienda Mujeres' }
   ].filter(store => !openStoreIds.includes(store.id))
 
   // Get current shift for selected store

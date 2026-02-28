@@ -58,7 +58,7 @@ export function ProductSearch({
   onSelect,
   placeholder = 'Buscar por nombre o código de barras...',
   className = '',
-  warehouse = 'TIENDA_MUJERES'
+  warehouse = 'Tienda Mujeres'
 }: ProductSearchProps) {
   const [search, setSearch] = useState('')
   const [products, setProducts] = useState<Product[]>([])

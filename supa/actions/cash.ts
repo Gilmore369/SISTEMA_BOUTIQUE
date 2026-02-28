@@ -89,7 +89,9 @@ export async function closeCashShift(shiftId: string, closingAmount: number) {
       return { success: false, error: 'Turno no encontrado' }
     }
 
-    // Calculate expected amount (opening + CONTADO sales from this store - expenses)
+    const now = new Date().toISOString()
+
+    // Calculate expected amount (opening + CONTADO sales + collection payments - expenses)
     // NOTE: Column names are `total` and `sale_type` (not total_amount/payment_type)
     const { data: sales } = await supabase
       .from('sales')
@@ -97,11 +99,24 @@ export async function closeCashShift(shiftId: string, closingAmount: number) {
       .eq('store_id', shift.store_id)
       .eq('voided', false)
       .gte('created_at', shift.opened_at)
-      .lte('created_at', new Date().toISOString())
+      .lte('created_at', now)
 
     // Only count CONTADO sales (CREDITO sales don't enter the cash register)
     const cashSales = sales?.filter(s => s.sale_type === 'CONTADO') || []
     const totalCashSales = cashSales.reduce((sum, sale) => sum + parseFloat(sale.total?.toString() || '0'), 0)
+
+    // Collection payments (debt repayments) received during this shift
+    // These are cash that enters the register from credit clients
+    const { data: collectionPayments } = await supabase
+      .from('payments')
+      .select('amount')
+      .eq('user_id', shift.user_id)
+      .gte('created_at', shift.opened_at)
+      .lte('created_at', now)
+
+    const totalCollections = collectionPayments?.reduce(
+      (sum, p) => sum + parseFloat(p.amount?.toString() || '0'), 0
+    ) || 0
 
     // Get total expenses for this shift
     const { data: expenses } = await supabase
@@ -111,7 +126,7 @@ export async function closeCashShift(shiftId: string, closingAmount: number) {
 
     const totalExpenses = expenses?.reduce((sum, exp) => sum + parseFloat(exp.amount.toString()), 0) || 0
 
-    const expectedAmount = shift.opening_amount + totalCashSales - totalExpenses
+    const expectedAmount = shift.opening_amount + totalCashSales + totalCollections - totalExpenses
     const difference = closingAmount - expectedAmount
 
     // Update shift
@@ -135,10 +150,24 @@ export async function closeCashShift(shiftId: string, closingAmount: number) {
       closing_amount: closingAmount,
       expected_amount: expectedAmount,
       difference,
+      total_cash_sales: totalCashSales,
+      total_collections: totalCollections,
+      total_expenses: totalExpenses,
     }).catch(() => {})
 
     revalidatePath('/cash')
-    return { success: true, difference }
+    return {
+      success: true,
+      difference,
+      breakdown: {
+        opening: shift.opening_amount,
+        cashSales: totalCashSales,
+        collections: totalCollections,
+        expenses: totalExpenses,
+        expected: expectedAmount,
+        closing: closingAmount,
+      }
+    }
   } catch (error) {
     console.error('Error closing cash shift:', error)
     return {

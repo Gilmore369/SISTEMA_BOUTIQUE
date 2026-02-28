@@ -67,7 +67,7 @@ interface ProductModel {
 
 export function BulkProductEntryV2() {
   const [supplier, setSupplier] = useState('')
-  const [warehouse, setWarehouse] = useState('TIENDA_MUJERES')
+  const [warehouse, setWarehouse] = useState('Tienda Mujeres')
   const [models, setModels] = useState<ProductModel[]>([])
   const [saving, setSaving] = useState(false)
   
@@ -230,14 +230,17 @@ export function BulkProductEntryV2() {
 
   // Cargar modelo existente en el formulario
   const loadExistingModel = async (existingModel: any) => {
+    // MANTENER el mismo base_code para que se agrupe en el catálogo visual
+    const baseCode = existingModel.baseCode
+
     const newModel: ProductModel = {
       id: crypto.randomUUID(),
-      baseCode: existingModel.baseCode,
-      baseName: existingModel.baseName,
+      baseCode: baseCode, // MISMO código para agrupar todos los colores
+      baseName: existingModel.baseName, // Mismo nombre base
       lineId: existingModel.lineId || '',
       categoryId: existingModel.categoryId || '',
       brandId: existingModel.brandId || '',
-      color: existingModel.color || '',
+      color: '', // Vacío para que el usuario ingrese el nuevo color
       imageUrl: existingModel.imageUrl || '',
       purchasePrice: existingModel.purchasePrice || 0,
       salePrice: existingModel.salePrice || 0,
@@ -253,7 +256,7 @@ export function BulkProductEntryV2() {
     setModels([...models, newModel])
     setSearchQuery('')
     setSearchResults([])
-    toast.success(`Modelo "${existingModel.baseName}" cargado`)
+    toast.success(`Modelo "${existingModel.baseName}" cargado con código ${baseCode}. Agrega el nuevo color.`)
   }
 
   const addModel = () => {
@@ -288,8 +291,11 @@ export function BulkProductEntryV2() {
       // Cargar tallas y esperar a que termine
       await loadSizesForCategory(value)
       
-      // Generar código automáticamente (no bloqueante)
-      generateCodeForModel(id, value)
+      // Solo generar código si el modelo no tiene uno (es nuevo)
+      const currentModel = models.find(m => m.id === id)
+      if (!currentModel?.baseCode) {
+        generateCodeForModel(id, value)
+      }
       
       // Actualizar estado con nueva categoría, resetear variantes, mantener expanded
       setModels(models.map(m => 
@@ -578,8 +584,8 @@ export function BulkProductEntryV2() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="TIENDA_MUJERES">Tienda Mujeres</SelectItem>
-                  <SelectItem value="TIENDA_HOMBRES">Tienda Hombres</SelectItem>
+                  <SelectItem value="Tienda Mujeres">Tienda Mujeres</SelectItem>
+                  <SelectItem value="Tienda Hombres">Tienda Hombres</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -598,7 +604,7 @@ export function BulkProductEntryV2() {
               </Label>
             </div>
             <p className="text-xs text-blue-700">
-              Escribe el nombre del modelo para cargar sus datos y actualizar stock, o crear una variante con nuevo código
+              Busca un modelo existente para agregar un nuevo color. El sistema mantendrá el mismo código base para agrupar todos los colores en el catálogo visual.
             </p>
             <div className="flex gap-2">
               <Input
@@ -699,6 +705,19 @@ export function BulkProductEntryV2() {
             {/* Model Content */}
             {model.expanded && (
               <div className="p-4 space-y-4">
+                {/* Info banner - always show to explain base_code */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-900 font-medium mb-1">
+                    📦 Código Base: {model.baseCode || 'Se generará automáticamente'}
+                  </p>
+                  <p className="text-xs text-blue-700">
+                    El <strong>código base</strong> agrupa todos los colores del mismo modelo en el catálogo visual. 
+                    {model.baseCode 
+                      ? ' Este modelo ya existe. Todos los colores que agregues se mostrarán juntos en la misma tarjeta.'
+                      : ' Se generará automáticamente al seleccionar la categoría.'}
+                  </p>
+                </div>
+                
                 {/* Base Fields */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
@@ -713,7 +732,9 @@ export function BulkProductEntryV2() {
                       className="flex-1 bg-gray-50"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Se genera automáticamente al seleccionar categoría
+                      {model.baseCode 
+                        ? 'Código del modelo (compartido por todos los colores)' 
+                        : 'Se genera automáticamente al seleccionar categoría'}
                     </p>
                   </div>
 
@@ -804,9 +825,12 @@ export function BulkProductEntryV2() {
                       value={model.color}
                       onChange={value => updateModel(model.id, 'color', value)}
                       placeholder="Selecciona o escribe un color"
+                      required
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Se aplica a todas las tallas. Puedes personalizar por talla más abajo.
+                      {model.baseCode 
+                        ? '⚠️ Ingresa el NUEVO color que quieres agregar a este modelo' 
+                        : 'Se aplica a todas las tallas. Puedes personalizar por talla más abajo.'}
                     </p>
                   </div>
 

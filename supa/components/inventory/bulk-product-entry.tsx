@@ -72,7 +72,7 @@ interface ProductModel {
 
 export function BulkProductEntry() {
   const [supplier, setSupplier] = useState('')
-  const [warehouse, setWarehouse] = useState('TIENDA_MUJERES')
+  const [warehouse, setWarehouse] = useState('Tienda Mujeres')
   const [models, setModels] = useState<ProductModel[]>([])
   const [availableSizes, setAvailableSizes] = useState<Size[]>([])
   const [saving, setSaving] = useState(false)
@@ -313,8 +313,8 @@ export function BulkProductEntry() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="TIENDA_MUJERES">Tienda Mujeres</SelectItem>
-                <SelectItem value="TIENDA_HOMBRES">Tienda Hombres</SelectItem>
+                <SelectItem value="Tienda Mujeres">Tienda Mujeres</SelectItem>
+                <SelectItem value="Tienda Hombres">Tienda Hombres</SelectItem>
               </SelectContent>
             </Select>
           </div>

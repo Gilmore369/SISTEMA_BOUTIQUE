@@ -36,7 +36,7 @@ interface MovementsTableProps {
 type SortField = 'fecha' | 'tipo' | 'producto' | 'tienda' | 'cantidad' | 'motivo'
 type SortOrder = 'asc' | 'desc'
 
-type StoreFilter = 'all' | 'Mujeres' | 'Hombres'
+type StoreFilter = 'all' | 'Tienda Mujeres' | 'Tienda Hombres'
 
 export function MovementsTable({ data }: MovementsTableProps) {
   const [sortField, setSortField] = useState<SortField>('fecha')
@@ -116,9 +116,9 @@ export function MovementsTable({ data }: MovementsTableProps) {
   }
 
   const storeOptions: { value: StoreFilter; label: string }[] = [
-    { value: 'all',     label: 'Ambas tiendas' },
-    { value: 'Mujeres', label: 'Mujeres' },
-    { value: 'Hombres', label: 'Hombres' },
+    { value: 'all',              label: 'Ambas tiendas' },
+    { value: 'Tienda Mujeres',   label: 'Tienda Mujeres' },
+    { value: 'Tienda Hombres',   label: 'Tienda Hombres' },
   ]
 
   return (
